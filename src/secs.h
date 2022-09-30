@@ -52,27 +52,40 @@ typedef struct {
     const char *name;
 } EcsComponent;
 
-#define MAX_ECS_VIEW_COMPONENTS 16
+#define MAX_ECS_COMPONENTS 16
 
 typedef struct {
-    void *componentData[MAX_ECS_VIEW_COMPONENTS];
-    size_t componentIndex[MAX_ECS_VIEW_COMPONENTS];
+    void *componentData[MAX_ECS_COMPONENTS];
+    EcsEntity componentIndex[MAX_ECS_COMPONENTS];
     EcsEntity entityId;
 } EcsView;
 typedef void(*EcsSystemFn)(EcsView*);
+typedef struct {
+    EcsSystemFn callback;
+    EcsEntity components[MAX_ECS_COMPONENTS];
+    size_t sizeOfComponents;
+} EcsSystemComponent;
 
-#define ECS_ID(T) Ecs__##T
+#define ECS_ID(T) Ecs##T
 #define ECS_DECLARE(T) EcsEntity ECS_ID(T)
 #define ECS_COMPONENT(WORLD, T) NewComponent(WORLD, sizeof(T))
 #define ECS_TAG(WORLD) NewComponent(WORLD, 0)
 #define ECS_QUERY(WORLD, CB, ...) do { \
     EcsEntity components[] = { __VA_ARGS__ }; \
     size_t sizeOfComponents = sizeof(components) / sizeof(EcsEntity); \
-    assert(sizeOfComponents < MAX_ECS_VIEW_COMPONENTS); \
+    assert(sizeOfComponents < MAX_ECS_COMPONENTS); \
     EcsQuery(WORLD, CB, components, sizeOfComponents); \
 } while(0);
 #define ECS_FIELD(VIEW, T, IDX) (T*)EcsField(VIEW, IDX)
-#define ECS_SYSTEM(WORLD, CB, ...) NewSystem(WORLD, CB, sizeof((uint64_t[]) {__VA_ARGS__}) / sizeof(uint64_t), __VA_ARGS__)
+#define ECS_SYSTEM(WORLD, CB, ...) NewSystem(WORLD, CB, (EcsEntity[]){ __VA_ARGS__ }, sizeof((EcsEntity[]){ __VA_ARGS__ }) / sizeof(EcsEntity))
+
+#define ECS_BOOTSTRAP \
+    X(System, sizeof(EcsSystemComponent)) \
+    X(ChildOf, 0) \
+
+#define X(NAME, _) extern EcsEntity ECS_ID(NAME);
+ECS_BOOTSTRAP
+#undef X
 
 #if defined(__cplusplus)
 extern "C" {
@@ -82,7 +95,7 @@ EcsWorld* NewWorld(void);
 void DeleteWorld(EcsWorld **world);
 EcsEntity NewEntity(EcsWorld *world);
 EcsEntity NewComponent(EcsWorld *world, size_t sizeOfComponent);
-EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, size_t n, ...);
+EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, EcsEntity *components, size_t sizeOfComponents);
 void DeleteEntity(EcsWorld *world, EcsEntity entity);
 bool EcsHas(EcsWorld *world, EcsEntity entity, EcsEntity component);
 void EcsAttach(EcsWorld *world, EcsEntity entity, EcsEntity component);

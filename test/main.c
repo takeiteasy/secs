@@ -66,14 +66,11 @@ int main(int argc, char *argv[]) {
     
     EcsDetach(world, e2, position);
     Position *p1a = EcsGet(world, e1, position);
-    TEST(e1, 0);
     TEST(EcsHas(world, e1, position), true);
     TEST(p1a->x, 1.f);
     TEST(p1a->y, 2.f);
-    TEST(e2, 2);
     TEST(EcsHas(world, e2, position), false);
     TEST(EcsGet(world, e2, position), NULL);
-    TEST(e3, 3);
     TEST(EcsHas(world, e3, position), false);
     TEST(EcsGet(world, e3, position), NULL);
 
@@ -95,6 +92,11 @@ int main(int argc, char *argv[]) {
     EcsAttach(world, e4, velocity);
     EcsEntity testSystem1 = ECS_SYSTEM(world, posCb, position);
     EcsEntity testSystem2 = ECS_SYSTEM(world, moveCb, position, velocity);
+    
+    EcsStep(world);
+    TEST(posCbCounter, 5);
+    TEST(moveCbCounter, 3);
+    
     
     DeleteWorld(&world);
     return 0;

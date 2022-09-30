@@ -184,10 +184,19 @@ struct EcsWorld {
     EcsEntity nextAvailableId;
 };
 
+#define X(NAME, _) EcsEntity ECS_ID(NAME) = -1ull;
+ECS_BOOTSTRAP
+#undef X
+
 EcsWorld* NewWorld(void) {
     EcsWorld *result = malloc(sizeof(EcsWorld));
     *result = (EcsWorld){0};
     result->nextAvailableId = EcsNil;
+    
+#define X(NAME, SZ) ECS_ID(NAME) = NewComponent(result, SZ);
+    ECS_BOOTSTRAP
+#undef X
+    
     return result;
 }
 
@@ -246,12 +255,18 @@ bool EcsHas(EcsWorld *world, EcsEntity entity, EcsEntity component) {
 }
 
 EcsEntity NewComponent(EcsWorld *world, size_t sizeOfComponent) {
-    EcsEntity result = NewEntity(world);
-    return EcsAssure(world, result, sizeOfComponent) ? result : EcsNil;
+    EcsEntity e = NewEntity(world);
+    return EcsAssure(world, e, sizeOfComponent) ? e : EcsNil;
 }
 
-EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, size_t n, ...) {
-    return EcsNil;
+EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, EcsEntity *components, size_t sizeOfComponents) {
+    EcsEntity e = NewEntity(world);
+    EcsAttach(world, e, EcsSystem);
+    EcsSystemComponent *c = EcsGet(world, e, EcsSystem);
+    c->callback = fn;
+    c->sizeOfComponents = sizeOfComponents;
+    memcpy(c->components, components, sizeOfComponents * sizeof(EcsEntity));
+    return e;
 }
 
 void DeleteEntity(EcsWorld *world, EcsEntity e) {
@@ -309,16 +324,20 @@ void EcsSet(EcsWorld *world, EcsEntity entity, EcsEntity component, const void *
 }
 
 void EcsStep(EcsWorld *world) {
-    
+    EcsStorage *storage = world->storages[EcsSystem];
+    for (int i = 0; i < storage->sparse->sizeOfDense; i++) {
+        EcsSystemComponent *system = StorageGet(storage, storage->sparse->dense[i]);
+        EcsQuery(world, system->callback, system->components, system->sizeOfComponents);
+    }
 }
 
-void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t sizeOfComponents) {
-    assert(sizeOfComponents < MAX_ECS_VIEW_COMPONENTS);
+void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t sizeOfComponents) { // This needs optimizing
+    assert(sizeOfComponents < MAX_ECS_COMPONENTS);
     for (size_t e = 0; e < world->sizeOfEntities; e++) {
         assert(EcsIsValid(world, world->entities[e]));
         bool hasComponents = true;
         EcsView view = { .entityId = world->entities[e] };
-        for (int i = 0; i < MAX_ECS_VIEW_COMPONENTS; i++) {
+        for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
             view.componentIndex[i] = EcsNil;
             view.componentData[i] = NULL;
         }
@@ -341,5 +360,5 @@ void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t siz
 }
 
 void* EcsField(EcsView *view, size_t index) {
-    return index >= MAX_ECS_VIEW_COMPONENTS || view->componentIndex[index] == EcsNil ? NULL : view->componentData[index];
+    return index >= MAX_ECS_COMPONENTS || view->componentIndex[index] == EcsNil ? NULL : view->componentData[index];
 }
