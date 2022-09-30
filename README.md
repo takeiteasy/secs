@@ -4,8 +4,9 @@ _secs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work
 ## TODO
 - [ ] Create a simple Makefile
 - [ ] Documentation
+- [ ] Queries
+- [ ] Systems
 - [X] ~~Tags~~
-- [ ] Entity/Component deletion
 - [ ] Hierarchies/Relationships
 - [ ] Pipelines
 - [ ] Prefabs
