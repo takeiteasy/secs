@@ -9,7 +9,7 @@ _secs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work
 - [X] ~~Tags~~
 - [ ] Relationships
 - [ ] Pipelines
-- [ ] Prefabs
+- [X] ~~Prefabs~~
 - [ ] Observers
 - [ ] Component ctor/dtor
 - [ ] Reflection
