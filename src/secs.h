@@ -26,25 +26,11 @@ typedef union {
     uint64_t id;
 } Entity;
 
-typedef union {
-    struct {
-        uint32_t lo;
-        uint32_t hi;
-    } parts;
-    uint64_t id;
-} Pair;
-
-#define ECS_ENTITY(ID, VER, TAG) (Entity) { \
+#define ECS_COMPOSE_ENTITY(ID, VER, TAG) (Entity) { \
     .parts = { \
         .id = ID, \
         .version = VER, \
         .flags = TAG \
-    } \
-}
-#define ECS_PAIR(A, B) (Pair) { \
-    .parts = { \
-        .lo = A.parts.id, \
-        .hi = B.parts.id \
     } \
 }
 #define ENTITY_ID(E) ((E).parts.id)
@@ -58,6 +44,20 @@ typedef struct {
     size_t sizeOfComponent;
     const char *name;
 } Component;
+
+#define ECS_ID(T) Ecs##T
+#define ECS_DECLARE(T) Entity ECS_ID(T)
+#define ECS_COMPONENT(WORLD, T) EcsNewComponent(WORLD, sizeof(T))
+#define ECS_TAG(WORLD) EcsNewComponent(WORLD, 0)
+#define ECS_QUERY(WORLD, CB, ...) do { \
+    Entity components[] = { __VA_ARGS__ }; \
+    size_t sizeOfComponents = sizeof(components) / sizeof(Entity); \
+    assert(sizeOfComponents < MAX_ECS_COMPONENTS); \
+    EcsQuery(WORLD, CB, components, sizeOfComponents); \
+} while(0);
+#define ECS_FIELD(VIEW, T, IDX) (T*)EcsViewField(VIEW, IDX)
+#define ECS_SYSTEM(WORLD, CB, ...) EcsNewSystem(WORLD, CB, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
+#define ECS_PREFAB(WORLD, ...) EcsNewPrefab(WORLD, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
 
 #define MAX_ECS_COMPONENTS 16
 
@@ -75,19 +75,23 @@ typedef struct {
     size_t sizeOfComponents;
 } System;
 
-#define ECS_ID(T) Ecs##T
-#define ECS_DECLARE(T) Entity ECS_ID(T)
-#define ECS_COMPONENT(WORLD, T) EcsComponent(WORLD, sizeof(T))
-#define ECS_TAG(WORLD) EcsComponent(WORLD, 0)
-#define ECS_QUERY(WORLD, CB, ...) do { \
-    Entity components[] = { __VA_ARGS__ }; \
-    size_t sizeOfComponents = sizeof(components) / sizeof(Entity); \
-    assert(sizeOfComponents < MAX_ECS_COMPONENTS); \
-    EcsQuery(WORLD, CB, components, sizeOfComponents); \
-} while(0);
-#define ECS_FIELD(VIEW, T, IDX) (T*)EcsField(VIEW, IDX)
-#define ECS_SYSTEM(WORLD, CB, ...) EcsSystem(WORLD, CB, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
-#define ECS_PREFAB(WORLD, ...) EcsPrefab(WORLD, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
+#define ECS_BOOTSTRAP \
+    X(System, sizeof(System)) \
+    X(Prefab, sizeof(Prefab)) \
+    X(Childof, 0)
+
+#define X(NAME, _) extern Entity ECS_ID(NAME);
+ECS_BOOTSTRAP
+#undef X
+
+typedef enum {
+    EcsComponentType = (1 << 0),
+    EcsSystemType = (1 << 1),
+    EcsPrefabType = (1 << 2),
+    EcsPairType = (1 << 3)
+} EntityFlags;
+
+#define ECS_ENTITY_ISA(E, TYPE) ((E).parts.flags == Ecs##Type)
 
 #if defined(__cplusplus)
 extern "C" {
@@ -95,19 +99,23 @@ extern "C" {
 
 World* EcsWorld(void);
 void DeleteWorld(World **world);
-Entity EcsEntity(World *world);
-Entity EcsComponent(World *world, size_t sizeOfComponent);
-Entity EcsSystem(World *world, SystemCb fn, Entity *components, size_t sizeOfComponents);
-Entity EcsPrefab(World *world, Entity *components, size_t sizeOfComponents);
+
+Entity EcsNewEntity(World *world);
+Entity EcsNewComponent(World *world, size_t sizeOfComponent);
+Entity EcsNewSystem(World *world, SystemCb fn, Entity *components, size_t sizeOfComponents);
+Entity EcsNewPrefab(World *world, Entity *components, size_t sizeOfComponents);
 void DeleteEntity(World *world, Entity entity);
+
 bool EcsHas(World *world, Entity entity, Entity component);
 void EcsAttach(World *world, Entity entity, Entity component);
+void EcsRelation(World *world, Entity entity, Entity object, Entity relation);
 void EcsDetach(World *world, Entity entity, Entity component);
 void* EcsGet(World *world, Entity entity, Entity component);
 void EcsSet(World *world, Entity entity, Entity component, const void *data);
+
 void EcsStep(World *world);
 void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents);
-void* EcsField(View *view, size_t index);
+void* EcsViewField(View *view, size_t index);
 
 #if defined(__cplusplus)
 }
