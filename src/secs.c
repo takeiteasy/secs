@@ -19,27 +19,29 @@
     } while (0)
 
 #define ECS_DEFINE_DTOR(T, ...) \
-    void Delete##T(Ecs##T **T)  \
+    void Delete##T(T **p)       \
     {                           \
-        Ecs##T *_##T = *T;      \
-        if (!T || !_##T)        \
+        T *_p = *p;             \
+        if (!p || !_p)          \
             return;             \
         __VA_ARGS__             \
-        SAFE_FREE(_##T);        \
-        *T = NULL;              \
+        SAFE_FREE(_p);          \
+        *p = NULL;              \
     }
 
-const EcsEntity EcsNil = (EcsEntity)ENTITY_ID_MASK;
+const uint64_t EcsNil = 0xFFFFFFFFull;
+static const Entity EcsNilEntity = { .parts = { .id = EcsNil } };
+#define IS_NIL(E) ((E).parts.id == EcsNil)
 
 typedef struct {
-    EcsEntity *sparse;
-    EcsEntity *dense;
+    Entity *sparse;
+    Entity *dense;
     size_t sizeOfSparse;
     size_t sizeOfDense;
 } EcsSparse;
 
 typedef struct {
-    EcsEntity componentId;
+    Entity componentId;
     void *data;
     size_t sizeOfData;
     size_t sizeOfComponent;
@@ -47,22 +49,26 @@ typedef struct {
 } EcsStorage;
 
 #if defined(DEBUG)
+static void DumpEntity(Entity e) {
+    printf("(%llx: %d, %d, %d) ", e.id, e.parts.id, e.parts.version, e.parts.flags);
+}
+
 static void DumpSparse(EcsSparse *sparse) {
     printf("*** DUMP SPARSE ***\n");
     printf("sizeOfSparse: %zu, sizeOfDense: %zu\n", sparse->sizeOfSparse, sparse->sizeOfDense);
     printf("Sparse Contents:\n\t[");
     for (int i = 0; i < sparse->sizeOfSparse; i++)
-        printf("%llu, ", sparse->sparse[i]);
+        DumpEntity(sparse->sparse[i]);
     printf("]\nDense Contents:\n\t[");
     for (int i = 0; i < sparse->sizeOfDense; i++)
-        printf("%llu, ", sparse->dense[i]);
+        DumpEntity(sparse->dense[i]);
     printf("]\n*** END SPARSE DUMP ***\n");
 }
 
 static void DumpStorage(EcsStorage *storage) {
     printf("*** DUMP STORAGE ***\n");
-    printf("componentId: %llu, sizeOfData: %zu, sizeOfComponent: %zu\n",
-           storage->componentId, storage->sizeOfData, storage->sizeOfComponent);
+    printf("componentId: %u, sizeOfData: %zu, sizeOfComponent: %zu\n",
+           storage->componentId.parts.id, storage->sizeOfData, storage->sizeOfComponent);
     DumpSparse(storage->sparse);
     printf("*** END STORAGE DUMP ***\n");
 }
@@ -74,57 +80,58 @@ static EcsSparse* NewSparse(void) {
     return result;
 }
 
-static ECS_DEFINE_DTOR(Sparse, {
-    SAFE_FREE(_Sparse->sparse);
-    SAFE_FREE(_Sparse->dense);
+static ECS_DEFINE_DTOR(EcsSparse, {
+    SAFE_FREE(_p->sparse);
+    SAFE_FREE(_p->dense);
 });
 
-static bool SparseHas(EcsSparse *sparse, EcsEntity e) {
+static bool SparseHas(EcsSparse *sparse, Entity e) {
     assert(sparse);
-    assert(e != EcsNil);
-    const EcsEntity id = ENTITY_ID(e);
-    return (id < sparse->sizeOfSparse) && (sparse->sparse[id] != EcsNil);
+    uint32_t id = ENTITY_ID(e);
+    assert(id != EcsNil);
+    return (id < sparse->sizeOfSparse) && (ENTITY_ID(sparse->sparse[id]) != EcsNil);
 }
 
-static void SparseEmplace(EcsSparse *sparse, EcsEntity e) {
+static void SparseEmplace(EcsSparse *sparse, Entity e) {
     assert(sparse);
-    assert(e != EcsNil);
-    const EcsEntity id = ENTITY_ID(e);
+    uint32_t id = ENTITY_ID(e);
+    assert(id != EcsNil);
     if (id >= sparse->sizeOfSparse) {
         const size_t newSize = id + 1;
         sparse->sparse = realloc(sparse->sparse, newSize * sizeof * sparse->sparse);
         for (size_t i = sparse->sizeOfSparse; i < newSize; i++)
-            sparse->sparse[i] = EcsNil;
+            sparse->sparse[i] = EcsNilEntity;
         sparse->sizeOfSparse = newSize;
     }
-    sparse->sparse[id] = (EcsEntity)sparse->sizeOfDense;
+    sparse->sparse[id] = (Entity) { .parts = { .id = (uint32_t)sparse->sizeOfDense } };
     sparse->dense = realloc(sparse->dense, (sparse->sizeOfDense + 1) * sizeof * sparse->dense);
     sparse->dense[sparse->sizeOfDense++] = e;
 }
 
-static size_t SparseRemove(EcsSparse *sparse, EcsEntity e) {
+static size_t SparseRemove(EcsSparse *sparse, Entity e) {
     assert(sparse);
     assert(SparseHas(sparse, e));
     
-    const EcsEntity id = ENTITY_ID(e);
-    size_t pos = sparse->sparse[id];
-    EcsEntity other = sparse->dense[sparse->sizeOfDense-1];
+    const uint32_t id = ENTITY_ID(e);
+    uint32_t pos = ENTITY_ID(sparse->sparse[id]);
+    Entity other = sparse->dense[sparse->sizeOfDense-1];
     
-    sparse->sparse[ENTITY_ID(other)] = (EcsEntity)pos;
+    sparse->sparse[ENTITY_ID(other)] = (Entity) { .parts = { .id = pos } };
     sparse->dense[pos] = other;
-    sparse->sparse[id] = EcsNil;
+    sparse->sparse[id] = EcsNilEntity;
     sparse->dense = realloc(sparse->dense, --sparse->sizeOfDense * sizeof * sparse->dense);
     
     return pos;
 }
 
-static size_t SparseAt(EcsSparse *sparse, EcsEntity e) {
+static size_t SparseAt(EcsSparse *sparse, Entity e) {
     assert(sparse);
-    assert(e != EcsNil);
-    return sparse->sparse[ENTITY_ID(e)];
+    uint32_t id = ENTITY_ID(e);
+    assert(id != EcsNil);
+    return ENTITY_ID(sparse->sparse[id]);
 }
 
-static EcsStorage* NewStorage(EcsEntity id, size_t sz) {
+static EcsStorage* NewStorage(Entity id, size_t sz) {
     EcsStorage *result = malloc(sizeof(EcsStorage));
     *result = (EcsStorage) {
         .componentId = id,
@@ -136,17 +143,17 @@ static EcsStorage* NewStorage(EcsEntity id, size_t sz) {
     return result;
 }
 
-static ECS_DEFINE_DTOR(Storage, {
-    DeleteSparse(&_Storage->sparse);
+static ECS_DEFINE_DTOR(EcsStorage, {
+    DeleteEcsSparse(&_p->sparse);
 });
 
-static bool StorageHas(EcsStorage *storage, EcsEntity e) {
+static bool StorageHas(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(e != EcsNil);
+    assert(!IS_NIL(e));
     return SparseHas(storage->sparse, e);
 }
 
-static void* StorageEmplace(EcsStorage *storage, EcsEntity e) {
+static void* StorageEmplace(EcsStorage *storage, Entity e) {
     assert(storage);
     storage->data = realloc(storage->data, (storage->sizeOfData + 1) * sizeof(char) * storage->sizeOfComponent);
     storage->sizeOfData++;
@@ -155,7 +162,7 @@ static void* StorageEmplace(EcsStorage *storage, EcsEntity e) {
     return result;
 }
 
-static void StorageRemove(EcsStorage *storage, EcsEntity e) {
+static void StorageRemove(EcsStorage *storage, Entity e) {
     assert(storage);
     size_t pos = SparseRemove(storage->sparse, e);
     memmove(&((char*)storage->data)[pos * sizeof(char) * storage->sizeOfComponent],
@@ -170,64 +177,54 @@ static void* StorageAt(EcsStorage *storage, size_t pos) {
     return &((char*)storage->data)[pos * sizeof(char) * storage->sizeOfComponent];
 }
 
-static void* StorageGet(EcsStorage *storage, EcsEntity e) {
+static void* StorageGet(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(e != EcsNil);
+    assert(!IS_NIL(e));
     return StorageAt(storage, SparseAt(storage->sparse, e));
 }
 
-struct EcsWorld {
+struct World {
     EcsStorage **storages;
     size_t sizeOfStorages;
-    EcsEntity *entities;
+    Entity *entities;
     size_t sizeOfEntities;
-    EcsEntity nextAvailableId;
+    uint32_t nextAvailableId;
 };
 
-#define X(NAME, _) EcsEntity ECS_ID(NAME) = -1ull;
-ECS_BOOTSTRAP
-#undef X
-
-EcsWorld* NewWorld(void) {
-    EcsWorld *result = malloc(sizeof(EcsWorld));
-    *result = (EcsWorld){0};
+World* EcsWorld(void) {
+    World *result = malloc(sizeof(World));
+    *result = (World){0};
     result->nextAvailableId = EcsNil;
-    
-#define X(NAME, SZ) ECS_ID(NAME) = NewComponent(result, SZ);
-    ECS_BOOTSTRAP
-#undef X
-    
     return result;
 }
 
 ECS_DEFINE_DTOR(World, {
-    if (_World->storages)
-        for (int i = 0; i < _World->sizeOfStorages; i++)
-            DeleteStorage(&_World->storages[i]);
-    SAFE_FREE(_World->storages);
-    SAFE_FREE(_World->entities);
+    if (_p->storages)
+        for (int i = 0; i < _p->sizeOfStorages; i++)
+            DeleteEcsStorage(&_p->storages[i]);
+    SAFE_FREE(_p->storages);
+    SAFE_FREE(_p->entities);
 });
 
-EcsEntity NewEntity(EcsWorld *world) {
+Entity EcsEntity(World *world) {
     assert(world);
     if (world->nextAvailableId == EcsNil) {
-        assert(world->sizeOfEntities < ENTITY_ID_MASK);
-        world->entities = realloc(world->entities, ++world->sizeOfEntities * sizeof(EcsEntity));
-        EcsEntity e = ECS_ENTITY(world->sizeOfEntities-1, 0, 0);
+        world->entities = realloc(world->entities, ++world->sizeOfEntities * sizeof(Entity));
+        Entity e = ECS_ENTITY((uint32_t)world->sizeOfEntities-1, 0, 0);
         world->entities[world->sizeOfEntities-1] = e;
         return e;
     } else {
-        EcsEntity id = ENTITY_ID(world->nextAvailableId);
+        uint32_t id = world->nextAvailableId;
         world->nextAvailableId = ENTITY_ID(world->entities[id]);
-        EcsEntity new = ECS_ENTITY(id, ENTITY_VERSION(world->entities[id]), 0);
+        Entity new = ECS_ENTITY(id, world->entities[id].parts.version, 0);
         world->entities[id] = new;
         return new;
     }
 }
 
-static EcsStorage* EcsAssure(EcsWorld *world, EcsEntity componentId, size_t sizeOfComponent) {
+static EcsStorage* EcsAssure(World *world, Entity componentId, size_t sizeOfComponent) {
     for (int i = 0; i < world->sizeOfStorages; i++)
-        if (world->storages[i]->componentId == componentId)
+        if (ENTITY_ID(world->storages[i]->componentId) == ENTITY_ID(componentId))
             return world->storages[i];
     EcsStorage *new = NewStorage(componentId, sizeOfComponent);
     world->storages = realloc(world->storages, (world->sizeOfStorages + 1) * sizeof * world->storages);
@@ -235,62 +232,71 @@ static EcsStorage* EcsAssure(EcsWorld *world, EcsEntity componentId, size_t size
     return new;
 }
 
-static EcsStorage* EcsFind(EcsWorld *world, EcsEntity e) {
+static EcsStorage* EcsFind(World *world, Entity e) {
     for (int i = 0; i < world->sizeOfStorages; i++)
-        if (world->storages[i]->componentId == e)
+        if (ENTITY_ID(world->storages[i]->componentId) == ENTITY_ID(e))
             return world->storages[i];
     return NULL;
 }
 
-static bool EcsIsValid(EcsWorld *world, EcsEntity e) {
+static bool EcsIsValid(World *world, Entity e) {
     assert(world);
-    return ENTITY_ID(e) < world->sizeOfEntities && world->entities[ENTITY_ID(e)] == e;
+    uint32_t id = ENTITY_ID(e);
+    return id < world->sizeOfEntities && world->entities[id].parts.id == id;
 }
 
-bool EcsHas(EcsWorld *world, EcsEntity entity, EcsEntity component) {
+bool EcsHas(World *world, Entity entity, Entity component) {
     assert(world);
     assert(EcsIsValid(world, entity));
     assert(EcsIsValid(world, component));
     return StorageHas(EcsFind(world, component), entity);
 }
 
-EcsEntity NewComponent(EcsWorld *world, size_t sizeOfComponent) {
-    EcsEntity e = NewEntity(world);
-    return EcsAssure(world, e, sizeOfComponent) ? e : EcsNil;
+Entity EcsComponent(World *world, size_t sizeOfComponent) {
+    Entity e = EcsEntity(world);
+    return EcsAssure(world, e, sizeOfComponent) ? e : EcsNilEntity;
 }
 
-EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, EcsEntity *components, size_t sizeOfComponents) {
-    EcsEntity e = NewEntity(world);
-    EcsAttach(world, e, EcsSystem);
-    EcsSystemComponent *c = EcsGet(world, e, EcsSystem);
-    c->callback = fn;
-    c->sizeOfComponents = sizeOfComponents;
-    memcpy(c->components, components, sizeOfComponents * sizeof(EcsEntity));
+Entity EcsSystem(World *world, SystemCb fn, Entity *components, size_t sizeOfComponents) {
+    Entity e = EcsEntity(world);
+//    EcsAttach(world, e, EcsSystem);
+//    System *c = EcsGet(world, e, EcsSystem);
+//    c->callback = fn;
+//    c->sizeOfComponents = sizeOfComponents;
+//    for (int i = 0; i < MAX_ECS_COMPONENTS; i++)
+//        c->components[i].parts.id = EcsNil;
+//    memcpy(c->components, components, sizeOfComponents * sizeof(Entity));
     return e;
 }
 
-void DeleteEntity(EcsWorld *world, EcsEntity e) {
+Entity EcsPrefab(World *world, Entity *components, size_t sizeOfComponents) {
+    Entity e = EcsEntity(world);
+//    EcsAttach(world, e, EcsPrefab);
+//    Prefab *c = EcsGet(world, e, EcsPrefab);
+//    for (int i = 0; i < MAX_ECS_COMPONENTS; i++)
+//        (*c)[i].parts.id = EcsNil;
+//    memcpy(c, components, sizeOfComponents * sizeof(Entity));
+    return e;
+}
+
+void DeleteEntity(World *world, Entity e) {
     assert(world);
     assert(EcsIsValid(world, e));
     for (size_t i = world->sizeOfStorages; i; --i)
         if (world->storages[i - 1] && SparseHas(world->storages[i - 1]->sparse, e))
             StorageRemove(world->storages[i - 1], e);
-    world->entities[ENTITY_ID(e)] = ECS_ENTITY(ENTITY_ID(e), ENTITY_VERSION(e) + 1, 0);
-    world->nextAvailableId = ENTITY_ID(e);
+    uint32_t id = ENTITY_ID(e);
+    world->entities[id] = ECS_ENTITY(id, ENTITY_VERSION(e) + 1, 0);
+    world->nextAvailableId = id;
 }
 
-void EcsAttach(EcsWorld *world, EcsEntity entity, EcsEntity component) {
-    EcsStorage *storage = NULL;
-    for (int i = 0; i < world->sizeOfStorages; i++)
-        if (world->storages[i]->componentId == component) {
-            storage = world->storages[i]; ;
-            break;
-        }
+void EcsAttach(World *world, Entity entity, Entity component) {
+    EcsStorage *storage = EcsFind(world, component);
     assert(storage);
     StorageEmplace(storage, entity);
 }
 
-void EcsDetach(EcsWorld *world, EcsEntity entity, EcsEntity component) {
+void EcsDetach(World *world, Entity entity, Entity component) {
     assert(world);
     assert(EcsIsValid(world, entity));
     assert(EcsIsValid(world, component));
@@ -300,7 +306,7 @@ void EcsDetach(EcsWorld *world, EcsEntity entity, EcsEntity component) {
     StorageRemove(storage, entity);
 }
 
-void* EcsGet(EcsWorld *world, EcsEntity entity, EcsEntity component) {
+void* EcsGet(World *world, Entity entity, Entity component) {
     assert(world);
     assert(EcsIsValid(world, entity));
     assert(EcsIsValid(world, component));
@@ -309,7 +315,7 @@ void* EcsGet(EcsWorld *world, EcsEntity entity, EcsEntity component) {
     return StorageHas(storage, entity) ? StorageGet(storage, entity) : NULL;
 }
 
-void EcsSet(EcsWorld *world, EcsEntity entity, EcsEntity component, const void *data) {
+void EcsSet(World *world, Entity entity, Entity component, const void *data) {
     assert(world);
     assert(EcsIsValid(world, entity));
     assert(EcsIsValid(world, component));
@@ -323,22 +329,22 @@ void EcsSet(EcsWorld *world, EcsEntity entity, EcsEntity component, const void *
     memcpy(componentData, data, storage->sizeOfComponent);
 }
 
-void EcsStep(EcsWorld *world) {
-    EcsStorage *storage = world->storages[EcsSystem];
-    for (int i = 0; i < storage->sparse->sizeOfDense; i++) {
-        EcsSystemComponent *system = StorageGet(storage, storage->sparse->dense[i]);
-        EcsQuery(world, system->callback, system->components, system->sizeOfComponents);
-    }
+void EcsStep(World *world) {
+//    EcsStorage *storage = world->storages[EcsSystem];
+//    for (int i = 0; i < storage->sparse->sizeOfDense; i++) {
+//        System *system = StorageGet(storage, storage->sparse->dense[i]);
+//        EcsQuery(world, system->callback, system->components, system->sizeOfComponents);
+//    }
 }
 
-void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t sizeOfComponents) { // This needs optimizing
+void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents) { // This needs optimizing
     assert(sizeOfComponents < MAX_ECS_COMPONENTS);
     for (size_t e = 0; e < world->sizeOfEntities; e++) {
         assert(EcsIsValid(world, world->entities[e]));
         bool hasComponents = true;
-        EcsView view = { .entityId = world->entities[e] };
+        View view = { .entityId = world->entities[e] };
         for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
-            view.componentIndex[i] = EcsNil;
+            view.componentIndex[i].parts.id = EcsNil;
             view.componentData[i] = NULL;
         }
         
@@ -359,6 +365,6 @@ void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t siz
     }
 }
 
-void* EcsField(EcsView *view, size_t index) {
-    return index >= MAX_ECS_COMPONENTS || view->componentIndex[index] == EcsNil ? NULL : view->componentData[index];
+void* EcsField(View *view, size_t index) {
+    return index >= MAX_ECS_COMPONENTS || IS_NIL(view->componentIndex[index]) ? NULL : view->componentData[index];
 }

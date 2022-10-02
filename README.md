@@ -5,11 +5,13 @@ _secs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work
 - [ ] Create a simple Makefile
 - [ ] Documentation
 - [X] ~~Queries~~
-- [ ] Systems
+- [X] ~~Systems~~
 - [X] ~~Tags~~
-- [ ] Hierarchies/Relationships
+- [ ] Relationships
 - [ ] Pipelines
 - [ ] Prefabs
+- [ ] Observers
+- [ ] Component ctor/dtor
 - [ ] Reflection
 - [ ] Rules
 - [ ] Lua scripting

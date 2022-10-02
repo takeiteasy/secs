@@ -23,29 +23,27 @@ typedef struct {
 } Velocity;
 
 static int posCbCounter = 0;
-static void posCb(EcsView *view) {
-    Position *position = ECS_FIELD(view, Position, 0);
-    printf("posCb: ENTITY#%llu POS: x:%f,y:%f\n", view->entityId, position->x, position->y);
+static void posCb(View *view) {
+    TEST(!!ECS_FIELD(view, Position, 0), true);
     posCbCounter++;
 }
 
 static int moveCbCounter = 0;
-static void moveCb(EcsView *view) {
-    Position *position = ECS_FIELD(view, Position, 0);
-    Velocity *velocity = ECS_FIELD(view, Velocity, 1);
-    printf("moveCb: ENTITY#%llu POS: x:%f,y:%f, VEL: x:%f, y:%f\n", view->entityId, position->x, position->y, velocity->x, velocity->y);
+static void moveCb(View *view) {
+    TEST(!!ECS_FIELD(view, Position, 0), true);
+    TEST(!!ECS_FIELD(view, Velocity, 1), true);
     moveCbCounter++;
 }
 
 int main(int argc, char *argv[]) {
-    EcsWorld *world = NewWorld();
+    World *world = EcsWorld();
     
-    EcsEntity e1 = NewEntity(world);
-    EcsEntity position = ECS_COMPONENT(world, Position);
+    Entity e1 = EcsEntity(world);
+    Entity position = ECS_COMPONENT(world, Position);
     EcsAttach(world, e1, position);
-    EcsEntity e2 = NewEntity(world);
+    Entity e2 = EcsEntity(world);
     EcsAttach(world, e2, position);
-    EcsEntity e3 = NewEntity(world);
+    Entity e3 = EcsEntity(world);
     TEST(EcsHas(world, e1, position), true);
     TEST(EcsHas(world, e2, position), true);
     TEST(EcsHas(world, e3, position), false);
@@ -74,12 +72,12 @@ int main(int argc, char *argv[]) {
     TEST(EcsHas(world, e3, position), false);
     TEST(EcsGet(world, e3, position), NULL);
 
-    EcsEntity testTag = ECS_TAG(world);
+    Entity testTag = ECS_TAG(world);
     EcsAttach(world, e1, testTag);
     TEST(EcsHas(world, e1, testTag), true);
     TEST(EcsHas(world, e2, testTag), false);
     
-    EcsEntity velocity = ECS_COMPONENT(world, Velocity);
+    Entity velocity = ECS_COMPONENT(world, Velocity);
     EcsAttach(world, e2, position);
     ECS_QUERY(world, posCb, position);
     EcsAttach(world, e1, velocity);
@@ -87,16 +85,23 @@ int main(int argc, char *argv[]) {
     TEST(posCbCounter, 2);
     TEST(moveCbCounter, 1);
     
-    EcsEntity e4 = NewEntity(world);
+    Entity e4 = EcsEntity(world);
     EcsAttach(world, e4, position);
     EcsAttach(world, e4, velocity);
-    EcsEntity testSystem1 = ECS_SYSTEM(world, posCb, position);
-    EcsEntity testSystem2 = ECS_SYSTEM(world, moveCb, position, velocity);
+    Entity testSystem = ECS_SYSTEM(world, posCb, position);
+    ECS_SYSTEM(world, moveCb, position, velocity);
     
     EcsStep(world);
     TEST(posCbCounter, 5);
     TEST(moveCbCounter, 3);
     
+//    DeleteEntity(world, testSystem);
+//    EcsStep(world);
+//    TEST(posCbCounter, moveCbCounter);
+    
+    Entity e5 = EcsEntity(world);
+//    Entity testPrefab = ECS_PREFAB(world, position, velocity);
+//    EcsAttach(world, e5, testPrefab);
     
     DeleteWorld(&world);
     return 0;

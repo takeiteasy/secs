@@ -16,95 +16,98 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#define ENTITY_ID_MASK          0xFFFFFFFFull /* Mask to use to get the entity number out of an identifier.*/
-#define ENTITY_VERSION_SHIFT    32 /* Extent of the entity number within an identifier. */
-#define ENTITY_VERSION_MASK     (0xFFFFull << ENTITY_VERSION_SHIFT) /* Mask to use to get the version out of an identifier. */
-#define ENTITY_FLAG_SHIFT       56
-#define ENTITY_FLAG_MASK        (0xFFull << ENTITY_FLAG_SHIFT)
-#define ENTITY_PAIR_SHIFT       63
-#define ENTITY_PAIR_MASK        (1ull << ENTITY_PAIR_SHIFT)
+typedef union {
+    struct {
+        uint32_t id;
+        uint16_t version;
+        uint16_t unused;
+        uint8_t  flags;
+    } parts;
+    uint64_t id;
+} Entity;
 
-#define ECS_ENTITY(ID, VER, FLAG) \
-    (((EcsEntity)(ID)) | (((EcsEntity)(VER)) << ENTITY_VERSION_SHIFT) | (((EcsEntity)(FLAG)) << ENTITY_FLAG_SHIFT))
-#define ENTITY_VERSION(E) \
-    (EcsEntityID)(((EcsEntity)(E)) >> ENTITY_VERSION_SHIFT)
-#define ENTITY_ID(E) ((EcsEntityID)((E)&ENTITY_ID_MASK))
-#define ENTITY_FLAG(E) ((EcsEntityID)((E) >> ENTITY_FLAG_SHIFT))
-#define ENTITY_HAS(E, FLAG) ((E)&ENTITY_##FLAG##_MASK)
-#define ENTITY_ID_LO(E) ((EcsEntityID)(E))
-#define ENTITY_ID_HI(E) ((EcsEntityID)((E) >> ENTITY_VERSION_SHIFT))
-#define ECS_PAIR(A, B) (ENTITY_PAIR_MASK | ((EcsEntity)ENTITY_ID((B)) << 32 | (EcsEntity)ENTITY_ID((A))))
-#define IS_ENTITY_PAIR(E) ((E & ~ENTITY_PAIR_MASK))
-#define PAIR_FIRST(E) (ENTITY_ID_LO((E)))
-#define PAIR_RELATION PAIR_FIRST
-#define PAIR_SECOND(E) ((EcsEntityID)ENTITY_ID_HI((E & ~ENTITY_PAIR_MASK)))
-#define PAIR_OBJECT PAIR_SECOND
-#define PAIR_HAS_RELATION(E, REL) (ENTITY_HAS((E), PAIR) && (PAIR_RELATION((E)) == (REL)))
+typedef union {
+    struct {
+        uint32_t lo;
+        uint32_t hi;
+    } parts;
+    uint64_t id;
+} Pair;
 
-typedef uint64_t EcsEntity;
-typedef uint32_t EcsEntityID;
-extern const EcsEntity EcsNil;
-typedef struct EcsWorld EcsWorld;
+#define ECS_ENTITY(ID, VER, TAG) (Entity) { \
+    .parts = { \
+        .id = ID, \
+        .version = VER, \
+        .flags = TAG \
+    } \
+}
+#define ECS_PAIR(A, B) (Pair) { \
+    .parts = { \
+        .lo = A.parts.id, \
+        .hi = B.parts.id \
+    } \
+}
+#define ENTITY_ID(E) ((E).parts.id)
+#define ENTITY_VERSION(E) ((E).parts.version)
+
+extern const uint64_t EcsNil;
+typedef struct World World;
 
 typedef struct {
-    EcsEntity componentId;
+    Entity componentId;
     size_t sizeOfComponent;
     const char *name;
-} EcsComponent;
+} Component;
 
 #define MAX_ECS_COMPONENTS 16
 
 typedef struct {
     void *componentData[MAX_ECS_COMPONENTS];
-    EcsEntity componentIndex[MAX_ECS_COMPONENTS];
-    EcsEntity entityId;
-} EcsView;
-typedef void(*EcsSystemFn)(EcsView*);
+    Entity componentIndex[MAX_ECS_COMPONENTS];
+    Entity entityId;
+} View;
+
+typedef void(*SystemCb)(View*);
+typedef Entity Prefab[MAX_ECS_COMPONENTS];
 typedef struct {
-    EcsSystemFn callback;
-    EcsEntity components[MAX_ECS_COMPONENTS];
+    SystemCb callback;
+    Prefab components;
     size_t sizeOfComponents;
-} EcsSystemComponent;
+} System;
 
 #define ECS_ID(T) Ecs##T
-#define ECS_DECLARE(T) EcsEntity ECS_ID(T)
-#define ECS_COMPONENT(WORLD, T) NewComponent(WORLD, sizeof(T))
-#define ECS_TAG(WORLD) NewComponent(WORLD, 0)
+#define ECS_DECLARE(T) Entity ECS_ID(T)
+#define ECS_COMPONENT(WORLD, T) EcsComponent(WORLD, sizeof(T))
+#define ECS_TAG(WORLD) EcsComponent(WORLD, 0)
 #define ECS_QUERY(WORLD, CB, ...) do { \
-    EcsEntity components[] = { __VA_ARGS__ }; \
-    size_t sizeOfComponents = sizeof(components) / sizeof(EcsEntity); \
+    Entity components[] = { __VA_ARGS__ }; \
+    size_t sizeOfComponents = sizeof(components) / sizeof(Entity); \
     assert(sizeOfComponents < MAX_ECS_COMPONENTS); \
     EcsQuery(WORLD, CB, components, sizeOfComponents); \
 } while(0);
 #define ECS_FIELD(VIEW, T, IDX) (T*)EcsField(VIEW, IDX)
-#define ECS_SYSTEM(WORLD, CB, ...) NewSystem(WORLD, CB, (EcsEntity[]){ __VA_ARGS__ }, sizeof((EcsEntity[]){ __VA_ARGS__ }) / sizeof(EcsEntity))
-
-#define ECS_BOOTSTRAP \
-    X(System, sizeof(EcsSystemComponent)) \
-    X(ChildOf, 0) \
-
-#define X(NAME, _) extern EcsEntity ECS_ID(NAME);
-ECS_BOOTSTRAP
-#undef X
+#define ECS_SYSTEM(WORLD, CB, ...) EcsSystem(WORLD, CB, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
+#define ECS_PREFAB(WORLD, ...) EcsPrefab(WORLD, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-EcsWorld* NewWorld(void);
-void DeleteWorld(EcsWorld **world);
-EcsEntity NewEntity(EcsWorld *world);
-EcsEntity NewComponent(EcsWorld *world, size_t sizeOfComponent);
-EcsEntity NewSystem(EcsWorld *world, EcsSystemFn fn, EcsEntity *components, size_t sizeOfComponents);
-void DeleteEntity(EcsWorld *world, EcsEntity entity);
-bool EcsHas(EcsWorld *world, EcsEntity entity, EcsEntity component);
-void EcsAttach(EcsWorld *world, EcsEntity entity, EcsEntity component);
-void EcsDetach(EcsWorld *world, EcsEntity entity, EcsEntity component);
-void* EcsGet(EcsWorld *world, EcsEntity entity, EcsEntity component);
-void EcsSet(EcsWorld *world, EcsEntity entity, EcsEntity component, const void *data);
-void EcsStep(EcsWorld *world);
-void EcsQuery(EcsWorld *world, EcsSystemFn cb, EcsEntity *components, size_t sizeOfComponents);
-void* EcsField(EcsView *view, size_t index);
+World* EcsWorld(void);
+void DeleteWorld(World **world);
+Entity EcsEntity(World *world);
+Entity EcsComponent(World *world, size_t sizeOfComponent);
+Entity EcsSystem(World *world, SystemCb fn, Entity *components, size_t sizeOfComponents);
+Entity EcsPrefab(World *world, Entity *components, size_t sizeOfComponents);
+void DeleteEntity(World *world, Entity entity);
+bool EcsHas(World *world, Entity entity, Entity component);
+void EcsAttach(World *world, Entity entity, Entity component);
+void EcsDetach(World *world, Entity entity, Entity component);
+void* EcsGet(World *world, Entity entity, Entity component);
+void EcsSet(World *world, Entity entity, Entity component, const void *data);
+void EcsStep(World *world);
+void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents);
+void* EcsField(View *view, size_t index);
 
 #if defined(__cplusplus)
 }
