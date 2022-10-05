@@ -208,6 +208,7 @@ World* EcsWorld(void) {
     return result;
 }
 
+#define X(NAME, _) ECS_ID(NAME) = EcsNilEntity;
 ECS_DEFINE_DTOR(World, {
     if (_p->storages)
         for (int i = 0; i < _p->sizeOfStorages; i++)
@@ -215,7 +216,9 @@ ECS_DEFINE_DTOR(World, {
     SAFE_FREE(_p->storages);
     SAFE_FREE(_p->entities);
     SAFE_FREE(_p->recyclable);
+    ECS_BOOTSTRAP
 });
+#undef X
 
 bool EcsIsValid(World *world, Entity e) {
     assert(world);
@@ -244,21 +247,21 @@ Entity EcsNewEntity(World *world) {
     return EcsNewEntityType(world, EcsEntityType);
 }
 
-static EcsStorage* EcsAssure(World *world, Entity componentId, size_t sizeOfComponent) {
-    for (int i = 0; i < world->sizeOfStorages; i++)
-        if (ENTITY_ID(world->storages[i]->componentId) == ENTITY_ID(componentId))
-            return world->storages[i];
-    EcsStorage *new = NewStorage(componentId, sizeOfComponent);
-    world->storages = realloc(world->storages, (world->sizeOfStorages + 1) * sizeof * world->storages);
-    world->storages[world->sizeOfStorages++] = new;
-    return new;
-}
-
 static EcsStorage* EcsFind(World *world, Entity e) {
     for (int i = 0; i < world->sizeOfStorages; i++)
         if (ENTITY_ID(world->storages[i]->componentId) == ENTITY_ID(e))
             return world->storages[i];
     return NULL;
+}
+
+static EcsStorage* EcsAssure(World *world, Entity componentId, size_t sizeOfComponent) {
+    EcsStorage *found = EcsFind(world, componentId);
+    if (found)
+        return found;
+    EcsStorage *new = NewStorage(componentId, sizeOfComponent);
+    world->storages = realloc(world->storages, (world->sizeOfStorages + 1) * sizeof * world->storages);
+    world->storages[world->sizeOfStorages++] = new;
+    return new;
 }
 
 bool EcsHas(World *world, Entity entity, Entity component) {
@@ -309,11 +312,15 @@ void DeleteEntity(World *world, Entity e) {
 
 void EcsAttach(World *world, Entity entity, Entity component) {
     switch (component.parts.flag) {
-        case EcsPairType:
+        case EcsPairType: {
+            Entity o = EcsPairObject(world, component);
+            Entity r = EcsPairRelation(world, component);
+            EcsStorage *storage = EcsFind(world, o);
             break;
+        }
         case EcsSystemType:
             assert(false); // NOTE: potentially could be used for some sort of event system
-        case EcsPrefabType:;
+        case EcsPrefabType: {
             Prefab *c = EcsGet(world, component, EcsPrefab);
             for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
                 if (ECS_ENTITY_IS_NIL((*c)[i]))
@@ -321,14 +328,16 @@ void EcsAttach(World *world, Entity entity, Entity component) {
                 EcsAttach(world, entity, (*c)[i]);
             }
             break;
+        }
         case EcsComponentType:
-        default:;
+        default: {
             assert(EcsIsValid(world, entity));
             assert(EcsIsValid(world, component));
             EcsStorage *storage = EcsFind(world, component);
             assert(storage);
             StorageEmplace(storage, entity);
             break;
+        }
     }
 }
 

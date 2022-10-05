@@ -118,6 +118,9 @@ int main(int argc, char *argv[]) {
     TEST(ECS_CMP(pair_obj, EcsChildof), true);
     TEST(ECS_CMP(pair_rel, e5), true);
     
+    Entity e6 = EcsNewEntity(world);
+    EcsAttach(world, e6, pair_e);
+    
     DeleteWorld(&world);
     return 0;
 }
