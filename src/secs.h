@@ -20,23 +20,28 @@ typedef union {
     struct {
         uint32_t id;
         uint16_t version;
-        uint16_t unused;
-        uint8_t  flags;
+        uint8_t unused;
+        uint8_t flag;
     } parts;
     uint64_t id;
 } Entity;
 
-#define ECS_COMPOSE_ENTITY(ID, VER, TAG) (Entity) { \
-    .parts = { \
-        .id = ID, \
-        .version = VER, \
-        .flags = TAG \
-    } \
-}
+#define ECS_COMPOSE_ENTITY(ID, VER, TAG) \
+    (Entity)                             \
+    {                                    \
+        .parts = {                       \
+            .id = ID,                    \
+            .version = VER,              \
+            .flag = TAG                  \
+        }                                \
+    }
 #define ENTITY_ID(E) ((E).parts.id)
 #define ENTITY_VERSION(E) ((E).parts.version)
+#define ECS_ENTITY_IS_NIL(E) ((E).parts.id == EcsNil)
+#define ECS_CMP(A, B) ((A).id == (B).id)
 
 extern const uint64_t EcsNil;
+extern const Entity EcsNilEntity;
 typedef struct World World;
 
 typedef struct {
@@ -49,15 +54,18 @@ typedef struct {
 #define ECS_DECLARE(T) Entity ECS_ID(T)
 #define ECS_COMPONENT(WORLD, T) EcsNewComponent(WORLD, sizeof(T))
 #define ECS_TAG(WORLD) EcsNewComponent(WORLD, 0)
-#define ECS_QUERY(WORLD, CB, ...) do { \
-    Entity components[] = { __VA_ARGS__ }; \
-    size_t sizeOfComponents = sizeof(components) / sizeof(Entity); \
-    assert(sizeOfComponents < MAX_ECS_COMPONENTS); \
-    EcsQuery(WORLD, CB, components, sizeOfComponents); \
-} while(0);
-#define ECS_FIELD(VIEW, T, IDX) (T*)EcsViewField(VIEW, IDX)
-#define ECS_SYSTEM(WORLD, CB, ...) EcsNewSystem(WORLD, CB, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
-#define ECS_PREFAB(WORLD, ...) EcsNewPrefab(WORLD, (Entity[]){ __VA_ARGS__ }, sizeof((Entity[]){ __VA_ARGS__ }) / sizeof(Entity))
+#define ECS_QUERY(WORLD, CB, ...)                                      \
+    do                                                                 \
+    {                                                                  \
+        Entity components[] = {__VA_ARGS__};                           \
+        size_t sizeOfComponents = sizeof(components) / sizeof(Entity); \
+        assert(sizeOfComponents < MAX_ECS_COMPONENTS);                 \
+        EcsQuery(WORLD, CB, components, sizeOfComponents);             \
+    } while (0)
+#define ECS_FIELD(VIEW, T, IDX) (T *)EcsViewField(VIEW, IDX)
+#define ECS_SYSTEM(WORLD, CB, ...) EcsNewSystem(WORLD, CB, (Entity[]){__VA_ARGS__}, sizeof((Entity[]){__VA_ARGS__}) / sizeof(Entity))
+#define ECS_PREFAB(WORLD, ...) EcsNewPrefab(WORLD, (Entity[]){__VA_ARGS__}, sizeof((Entity[]){__VA_ARGS__}) / sizeof(Entity))
+#define ECS_ENTITY_ISA(E, TYPE) ((E).parts.flag == Ecs##TYPE##Type)
 
 #define MAX_ECS_COMPONENTS 16
 
@@ -75,7 +83,7 @@ typedef struct {
     size_t sizeOfComponents;
 } System;
 
-#define ECS_BOOTSTRAP \
+#define ECS_BOOTSTRAP         \
     X(System, sizeof(System)) \
     X(Prefab, sizeof(Prefab)) \
     X(Childof, 0)
@@ -85,13 +93,32 @@ ECS_BOOTSTRAP
 #undef X
 
 typedef enum {
+    EcsEntityType    = 0,
     EcsComponentType = (1 << 0),
-    EcsSystemType = (1 << 1),
-    EcsPrefabType = (1 << 2),
-    EcsPairType = (1 << 3)
+    EcsSystemType    = (1 << 1),
+    EcsPrefabType    = (1 << 2),
+    EcsPairType      = (1 << 3)
 } EntityFlags;
 
-#define ECS_ENTITY_ISA(E, TYPE) ((E).parts.flags == Ecs##Type)
+typedef union {
+    struct {
+        uint32_t object:32;
+        uint32_t relation:24;
+        uint8_t  flag:8;
+    } parts;
+    uint64_t id;
+} EntityPair;
+#define ECS_PAIR(A, B)                \
+    (EntityPair)                      \
+    {                                 \
+        .parts = {                    \
+            .object = ENTITY_ID(A),   \
+            .relation = ENTITY_ID(B), \
+            .flag = EcsPairType       \
+        }                             \
+    }
+#define ECS_PAIR_ENTITY(P) (ECS_ENTITY_ISA((P), Pair) ? (Entity){ .id = (P).id } : EcsNilEntity)
+#define ECS_ENTITY_PAIR(E) ((EntityPair) { .id = (E).id })
 
 #if defined(__cplusplus)
 extern "C" {
@@ -106,12 +133,17 @@ Entity EcsNewSystem(World *world, SystemCb fn, Entity *components, size_t sizeOf
 Entity EcsNewPrefab(World *world, Entity *components, size_t sizeOfComponents);
 void DeleteEntity(World *world, Entity entity);
 
+bool EcsIsValid(World *world, Entity e);
 bool EcsHas(World *world, Entity entity, Entity component);
 void EcsAttach(World *world, Entity entity, Entity component);
 void EcsRelation(World *world, Entity entity, Entity object, Entity relation);
 void EcsDetach(World *world, Entity entity, Entity component);
 void* EcsGet(World *world, Entity entity, Entity component);
 void EcsSet(World *world, Entity entity, Entity component, const void *data);
+
+Entity EcsNewPair(World *world, Entity a, Entity b);
+Entity EcsPairObject(World *world, Entity pair);
+Entity EcsPairRelation(World *world, Entity pair);
 
 void EcsStep(World *world);
 void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents);

@@ -2,7 +2,7 @@
 #include <assert.h>
 #include "secs.h"
 
-static int TEST_COUNTER = 1;
+static int TEST_COUNTER = 0;
 #if !defined(TEST_DIE_ON_FAILED)
 #define TEST_DIE_ON_FAILED true
 #endif
@@ -10,7 +10,7 @@ static int TEST_COUNTER = 1;
     do                                                                                                    \
     {                                                                                                     \
         bool res = (OBJECT) == (RESULT);                                                                  \
-        printf("[TEST%02d:%s] %s == %s\n", TEST_COUNTER++, res ? "SUCCESS" : "FAILED", #OBJECT, #RESULT); \
+        printf("[TEST%02d:%s] %s == %s\n", ++TEST_COUNTER, res ? "SUCCESS" : "FAILED", #OBJECT, #RESULT); \
         assert(!TEST_DIE_ON_FAILED || res);                                                               \
     } while (0)
 
@@ -104,6 +104,19 @@ int main(int argc, char *argv[]) {
     EcsAttach(world, e5, testPrefab);
     TEST(EcsHas(world, e5, position), true);
     TEST(EcsHas(world, e5, velocity), true);
+    
+    TEST(ECS_ENTITY_ISA(testPrefab, Prefab), true);
+    TEST(ECS_ENTITY_ISA(testSystemB, System), true);
+    TEST(ECS_ENTITY_ISA(position, Component), true);
+    TEST(ECS_ENTITY_ISA(e5, Component), false);
+    
+    EntityPair pair = ECS_PAIR(EcsChildof, e5);
+    TEST(ECS_ENTITY_ISA(pair, Pair), true);
+    Entity pair_e = ECS_PAIR_ENTITY(pair);
+    Entity pair_obj = EcsPairObject(world, pair_e);
+    Entity pair_rel = EcsPairRelation(world, pair_e);
+    TEST(ECS_CMP(pair_obj, EcsChildof), true);
+    TEST(ECS_CMP(pair_rel, e5), true);
     
     DeleteWorld(&world);
     return 0;

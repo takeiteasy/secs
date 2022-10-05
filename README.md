@@ -1,8 +1,8 @@
-# secs 
-_secs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work in progress.
+# s-ecs 
+_s-ecs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work in progress.
 
 ## TODO
-- [ ] Create a simple Makefile
+- [X] ~~Create a simple Makefile~~
 - [ ] Documentation
 - [X] ~~Queries~~
 - [X] ~~Systems~~
@@ -11,10 +11,9 @@ _secs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Work
 - [ ] Pipelines
 - [X] ~~Prefabs~~
 - [ ] Observers
-- [ ] Component ctor/dtor
 - [ ] Reflection
 - [ ] Rules
-- [ ] Lua scripting
+- [ ] Lua wrapper
 
 ## LICENSE
 ```

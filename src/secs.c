@@ -30,8 +30,7 @@
     }
 
 const uint64_t EcsNil = 0xFFFFFFFFull;
-static const Entity EcsNilEntity = { .parts = { .id = EcsNil } };
-#define IS_NIL(E) ((E).parts.id == EcsNil)
+const Entity EcsNilEntity = { .id = EcsNil };
 
 typedef struct {
     Entity *sparse;
@@ -50,7 +49,7 @@ typedef struct {
 
 #if defined(DEBUG)
 static void DumpEntitySimple(Entity e) {
-    printf("(%llx: %d, %d, %d)\n", e.id, e.parts.id, e.parts.version, e.parts.flags);
+    printf("(%llx: %d, %d, %d)\n", e.id, e.parts.id, e.parts.version, e.parts.flag);
 }
 
 static void DumpSparse(EcsSparse *sparse) {
@@ -149,7 +148,7 @@ static ECS_DEFINE_DTOR(EcsStorage, {
 
 static bool StorageHas(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(!IS_NIL(e));
+    assert(!ECS_ENTITY_IS_NIL(e));
     return SparseHas(storage->sparse, e);
 }
 
@@ -179,7 +178,7 @@ static void* StorageAt(EcsStorage *storage, size_t pos) {
 
 static void* StorageGet(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(!IS_NIL(e));
+    assert(!ECS_ENTITY_IS_NIL(e));
     return StorageAt(storage, SparseAt(storage->sparse, e));
 }
 
@@ -218,10 +217,10 @@ ECS_DEFINE_DTOR(World, {
     SAFE_FREE(_p->recyclable);
 });
 
-static bool EcsIsValid(World *world, Entity e) {
+bool EcsIsValid(World *world, Entity e) {
     assert(world);
     uint32_t id = ENTITY_ID(e);
-    return id < world->sizeOfEntities && world->entities[id].id == e.id;
+    return id < world->sizeOfEntities && ECS_CMP(world->entities[id], e);
 }
 
 static Entity EcsNewEntityType(World *world, uint8_t type) {
@@ -242,7 +241,7 @@ static Entity EcsNewEntityType(World *world, uint8_t type) {
 }
 
 Entity EcsNewEntity(World *world) {
-    return EcsNewEntityType(world, 0);
+    return EcsNewEntityType(world, EcsEntityType);
 }
 
 static EcsStorage* EcsAssure(World *world, Entity componentId, size_t sizeOfComponent) {
@@ -309,7 +308,7 @@ void DeleteEntity(World *world, Entity e) {
 }
 
 void EcsAttach(World *world, Entity entity, Entity component) {
-    switch (component.parts.flags) {
+    switch (component.parts.flag) {
         case EcsPairType:
             break;
         case EcsSystemType:
@@ -317,7 +316,7 @@ void EcsAttach(World *world, Entity entity, Entity component) {
         case EcsPrefabType:;
             Prefab *c = EcsGet(world, component, EcsPrefab);
             for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
-                if ((*c)[i].parts.id == EcsNil)
+                if (ECS_ENTITY_IS_NIL((*c)[i]))
                     break;
                 EcsAttach(world, entity, (*c)[i]);
             }
@@ -366,6 +365,32 @@ void EcsSet(World *world, Entity entity, Entity component, const void *data) {
     memcpy(componentData, data, storage->sizeOfComponent);
 }
 
+Entity EcsNewPair(World *world, Entity a, Entity b) {
+    assert(world);
+    assert(EcsIsValid(world, a));
+    assert(ECS_ENTITY_ISA(a, Component));
+    assert(EcsIsValid(world, b));
+    return ECS_PAIR_ENTITY(ECS_PAIR(a, b));
+}
+
+Entity EcsPairObject(World *world, Entity pair) {
+    assert(world);
+    assert(ECS_ENTITY_ISA(pair, Pair));
+    EntityPair p = ECS_ENTITY_PAIR(pair);
+    Entity obj = world->entities[p.parts.object];
+    assert(EcsIsValid(world, obj));
+    return obj;
+}
+
+Entity EcsPairRelation(World *world, Entity pair) {
+    assert(world);
+    assert(ECS_ENTITY_ISA(pair, Pair));
+    EntityPair p = ECS_ENTITY_PAIR(pair);
+    Entity rel = world->entities[p.parts.relation];
+    assert(EcsIsValid(world, rel));
+    return rel;
+}
+
 void EcsStep(World *world) {
     EcsStorage *storage = world->storages[ENTITY_ID(EcsSystem)];
     for (int i = 0; i < storage->sparse->sizeOfDense; i++) {
@@ -403,5 +428,5 @@ void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfCompon
 }
 
 void* EcsViewField(View *view, size_t index) {
-    return index >= MAX_ECS_COMPONENTS || IS_NIL(view->componentIndex[index]) ? NULL : view->componentData[index];
+    return index >= MAX_ECS_COMPONENTS || ECS_ENTITY_IS_NIL(view->componentIndex[index]) ? NULL : view->componentData[index];
 }
