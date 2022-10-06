@@ -77,20 +77,6 @@ typedef struct {
 
 typedef void(*SystemCb)(View*);
 typedef Entity Prefab[MAX_ECS_COMPONENTS];
-typedef struct {
-    SystemCb callback;
-    Prefab components;
-    size_t sizeOfComponents;
-} System;
-
-#define ECS_BOOTSTRAP         \
-    X(System, sizeof(System)) \
-    X(Prefab, sizeof(Prefab)) \
-    X(Childof, 0)
-
-#define X(NAME, _) extern Entity ECS_ID(NAME);
-ECS_BOOTSTRAP
-#undef X
 
 typedef enum {
     EcsEntityType    = 0,
