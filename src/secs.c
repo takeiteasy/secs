@@ -148,7 +148,7 @@ static ECS_DEFINE_DTOR(EcsStorage, {
 
 static bool StorageHas(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(!ECS_ENTITY_IS_NIL(e));
+    assert(!ENTITY_IS_NIL(e));
     return SparseHas(storage->sparse, e);
 }
 
@@ -178,7 +178,7 @@ static void* StorageAt(EcsStorage *storage, size_t pos) {
 
 static void* StorageGet(EcsStorage *storage, Entity e) {
     assert(storage);
-    assert(!ECS_ENTITY_IS_NIL(e));
+    assert(!ENTITY_IS_NIL(e));
     return StorageAt(storage, SparseAt(storage->sparse, e));
 }
 
@@ -223,7 +223,7 @@ ECS_DEFINE_DTOR(World, {
 bool EcsIsValid(World *world, Entity e) {
     assert(world);
     uint32_t id = ENTITY_ID(e);
-    return id < world->sizeOfEntities && ECS_CMP(world->entities[id], e);
+    return id < world->sizeOfEntities && ENTITY_CMP(world->entities[id], e);
 }
 
 static Entity EcsNewEntityType(World *world, uint8_t type) {
@@ -312,13 +312,13 @@ void DeleteEntity(World *world, Entity e) {
 
 void EcsAttach(World *world, Entity entity, Entity component) {
     switch (component.parts.flag) {
-        case EcsPairType: // Use EcsRelation()
+        case EcsRelationType: // Use EcsRelation()
         case EcsSystemType: // NOTE: potentially could be used for some sort of event system
             assert(false);
         case EcsPrefabType: {
             Prefab *c = EcsGet(world, component, EcsPrefab);
             for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
-                if (ECS_ENTITY_IS_NIL((*c)[i]))
+                if (ENTITY_IS_NIL((*c)[i]))
                     break;
                 EcsAttach(world, entity, (*c)[i]);
             }
@@ -340,9 +340,9 @@ void EcsAssociate(World *world, Entity entity, Entity object, Entity relation) {
     assert(world);
     assert(EcsIsValid(world, entity));
     assert(EcsIsValid(world, object));
-    assert(ECS_ENTITY_ISA(object, Component));
+    assert(ENTITY_ISA(object, Component));
     assert(EcsIsValid(world, relation));
-    assert(ECS_ENTITY_ISA(relation, Entity));
+    assert(ENTITY_ISA(relation, Entity));
     EcsAttach(world, entity, EcsRelation);
     Relation *pair = EcsGet(world, entity, EcsRelation);
     pair->object = object;
@@ -374,7 +374,7 @@ bool EcsHasRelation(World *world, Entity entity, Entity object) {
     Relation *relation = StorageGet(storage, entity);
     if (!relation)
         return false;
-    return ECS_CMP(relation->object, object);
+    return ENTITY_CMP(relation->object, object);
 }
 
 bool EcsRelated(World *world, Entity entity, Entity relation) {
@@ -386,7 +386,7 @@ bool EcsRelated(World *world, Entity entity, Entity relation) {
     Relation *_relation = StorageGet(storage, entity);
     if (!_relation)
         return false;
-    return ECS_CMP(_relation->relation, relation);
+    return ENTITY_CMP(_relation->relation, relation);
 }
 
 void* EcsGet(World *world, Entity entity, Entity component) {
@@ -418,7 +418,7 @@ void EcsRelations(World *world, Entity entity, Entity relation, SystemCb cb) {
         Entity e = world->entities[i];
         if (StorageHas(pairs, e)) {
             Relation *pair = StorageGet(pairs, e);
-            if (ECS_CMP(pair->object, relation) && ECS_CMP(pair->relation, entity)) {
+            if (ENTITY_CMP(pair->object, relation) && ENTITY_CMP(pair->relation, entity)) {
                 View view = { .entityId = e };
                 view.componentIndex[0] = relation;
                 view.componentData[0] = (void*)pair;
@@ -464,5 +464,5 @@ void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfCompon
 }
 
 void* EcsViewField(View *view, size_t index) {
-    return index >= MAX_ECS_COMPONENTS || ECS_ENTITY_IS_NIL(view->componentIndex[index]) ? NULL : view->componentData[index];
+    return index >= MAX_ECS_COMPONENTS || ENTITY_IS_NIL(view->componentIndex[index]) ? NULL : view->componentData[index];
 }

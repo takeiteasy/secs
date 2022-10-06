@@ -111,10 +111,10 @@ int main(int argc, char *argv[]) {
     TEST(EcsHas(world, e5, position), true);
     TEST(EcsHas(world, e5, velocity), true);
     
-    TEST(ECS_ENTITY_ISA(testPrefab, Prefab), true);
-    TEST(ECS_ENTITY_ISA(testSystemB, System), true);
-    TEST(ECS_ENTITY_ISA(position, Component), true);
-    TEST(ECS_ENTITY_ISA(e5, Component), false);
+    TEST(ENTITY_ISA(testPrefab, Prefab), true);
+    TEST(ENTITY_ISA(testSystemB, System), true);
+    TEST(ENTITY_ISA(position, Component), true);
+    TEST(ENTITY_ISA(e5, Component), false);
     
     Entity parent = EcsNewEntity(world);
     Entity child = EcsNewEntity(world);
