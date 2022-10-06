@@ -312,14 +312,9 @@ void DeleteEntity(World *world, Entity e) {
 
 void EcsAttach(World *world, Entity entity, Entity component) {
     switch (component.parts.flag) {
-        case EcsPairType: {
-            Entity o = EcsPairObject(world, component);
-            Entity r = EcsPairRelation(world, component);
-            EcsStorage *storage = EcsFind(world, o);
-            break;
-        }
-        case EcsSystemType:
-            assert(false); // NOTE: potentially could be used for some sort of event system
+        case EcsPairType: // Use EcsRelation()
+        case EcsSystemType: // NOTE: potentially could be used for some sort of event system
+            assert(false);
         case EcsPrefabType: {
             Prefab *c = EcsGet(world, component, EcsPrefab);
             for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
@@ -341,6 +336,19 @@ void EcsAttach(World *world, Entity entity, Entity component) {
     }
 }
 
+void EcsAssociate(World *world, Entity entity, Entity object, Entity relation) {
+    assert(world);
+    assert(EcsIsValid(world, entity));
+    assert(EcsIsValid(world, object));
+    assert(ECS_ENTITY_ISA(object, Component));
+    assert(EcsIsValid(world, relation));
+    assert(ECS_ENTITY_ISA(relation, Entity));
+    EcsAttach(world, entity, EcsRelation);
+    Relation *pair = EcsGet(world, entity, EcsRelation);
+    pair->object = object;
+    pair->relation = relation;
+}
+
 void EcsDetach(World *world, Entity entity, Entity component) {
     assert(world);
     assert(EcsIsValid(world, entity));
@@ -349,6 +357,38 @@ void EcsDetach(World *world, Entity entity, Entity component) {
     assert(storage);
     assert(StorageHas(storage, entity));
     StorageRemove(storage, entity);
+}
+
+void EcsDisassociate(World *world, Entity entity, Entity object, Entity relation) {
+    assert(EcsIsValid(world, entity));
+    assert(EcsIsValid(world, object));
+    assert(EcsIsValid(world, relation));
+    assert(EcsHas(world, entity, EcsRelation));
+    EcsDetach(world, entity, EcsRelation);
+}
+
+bool EcsHasRelation(World *world, Entity entity, Entity object) {
+    assert(EcsIsValid(world, entity));
+    assert(EcsIsValid(world, object));
+    EcsStorage *storage = EcsFind(world, EcsRelation);
+    if (!storage)
+        return false;
+    Relation *relation = StorageGet(storage, entity);
+    if (!relation)
+        return false;
+    return ECS_CMP(relation->object, object);
+}
+
+bool EcsRelated(World *world, Entity entity, Entity relation) {
+    assert(EcsIsValid(world, entity));
+    assert(EcsIsValid(world, relation));
+    EcsStorage *storage = EcsFind(world, EcsRelation);
+    if (!storage)
+        return false;
+    Relation *_relation = StorageGet(storage, entity);
+    if (!_relation)
+        return false;
+    return ECS_CMP(_relation->relation, relation);
 }
 
 void* EcsGet(World *world, Entity entity, Entity component) {
@@ -374,30 +414,20 @@ void EcsSet(World *world, Entity entity, Entity component, const void *data) {
     memcpy(componentData, data, storage->sizeOfComponent);
 }
 
-Entity EcsNewPair(World *world, Entity a, Entity b) {
-    assert(world);
-    assert(EcsIsValid(world, a));
-    assert(ECS_ENTITY_ISA(a, Component));
-    assert(EcsIsValid(world, b));
-    return ECS_PAIR_ENTITY(ECS_PAIR(a, b));
-}
-
-Entity EcsPairObject(World *world, Entity pair) {
-    assert(world);
-    assert(ECS_ENTITY_ISA(pair, Pair));
-    EntityPair p = ECS_ENTITY_PAIR(pair);
-    Entity obj = world->entities[p.parts.object];
-    assert(EcsIsValid(world, obj));
-    return obj;
-}
-
-Entity EcsPairRelation(World *world, Entity pair) {
-    assert(world);
-    assert(ECS_ENTITY_ISA(pair, Pair));
-    EntityPair p = ECS_ENTITY_PAIR(pair);
-    Entity rel = world->entities[p.parts.relation];
-    assert(EcsIsValid(world, rel));
-    return rel;
+void EcsRelations(World *world, Entity entity, Entity relation, SystemCb cb) {
+    EcsStorage *pairs = EcsFind(world, EcsRelation);
+    for (size_t i = 0; i < world->sizeOfEntities; i++) {
+        Entity e = world->entities[i];
+        if (StorageHas(pairs, e)) {
+            Relation *pair = StorageGet(pairs, e);
+            if (ECS_CMP(pair->object, relation) && ECS_CMP(pair->relation, entity)) {
+                View view = { .entityId = e };
+                view.componentIndex[0] = relation;
+                view.componentData[0] = (void*)pair;
+                cb(&view);
+            }
+        }
+    }
 }
 
 void EcsStep(World *world) {
@@ -411,7 +441,6 @@ void EcsStep(World *world) {
 void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents) {
     assert(sizeOfComponents < MAX_ECS_COMPONENTS);
     for (size_t e = 0; e < world->sizeOfEntities; e++) {
-        assert(EcsIsValid(world, world->entities[e]));
         bool hasComponents = true;
         View view = { .entityId = world->entities[e] };
         for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {

@@ -82,10 +82,14 @@ typedef struct {
     Prefab components;
     size_t sizeOfComponents;
 } System;
+typedef struct {
+    Entity object, relation;
+} Relation;
 
-#define ECS_BOOTSTRAP         \
-    X(System, sizeof(System)) \
-    X(Prefab, sizeof(Prefab)) \
+#define ECS_BOOTSTRAP             \
+    X(System, sizeof(System))     \
+    X(Prefab, sizeof(Prefab))     \
+    X(Relation, sizeof(Relation)) \
     X(Childof, 0)
 
 #define X(NAME, _) extern Entity ECS_ID(NAME);
@@ -99,26 +103,6 @@ typedef enum {
     EcsPrefabType    = (1 << 2),
     EcsPairType      = (1 << 3)
 } EntityFlags;
-
-typedef union {
-    struct {
-        uint32_t object:32;
-        uint32_t relation:24;
-        uint8_t  flag:8;
-    } parts;
-    uint64_t id;
-} EntityPair;
-#define ECS_PAIR(A, B)                \
-    (EntityPair)                      \
-    {                                 \
-        .parts = {                    \
-            .object = ENTITY_ID(A),   \
-            .relation = ENTITY_ID(B), \
-            .flag = EcsPairType       \
-        }                             \
-    }
-#define ECS_PAIR_ENTITY(P) (ECS_ENTITY_ISA((P), Pair) ? (Entity){ .id = (P).id } : EcsNilEntity)
-#define ECS_ENTITY_PAIR(E) ((EntityPair) { .id = (E).id })
 
 #if defined(__cplusplus)
 extern "C" {
@@ -136,14 +120,15 @@ void DeleteEntity(World *world, Entity entity);
 bool EcsIsValid(World *world, Entity e);
 bool EcsHas(World *world, Entity entity, Entity component);
 void EcsAttach(World *world, Entity entity, Entity component);
-void EcsRelation(World *world, Entity entity, Entity object, Entity relation);
+void EcsAssociate(World *world, Entity entity, Entity object, Entity relation);
 void EcsDetach(World *world, Entity entity, Entity component);
+void EcsDisassociate(World *world, Entity entity, Entity object, Entity relation);
+bool EcsHasRelation(World *world, Entity entity, Entity object);
+bool EcsRelated(World *world, Entity entity, Entity relation);
 void* EcsGet(World *world, Entity entity, Entity component);
 void EcsSet(World *world, Entity entity, Entity component, const void *data);
-
-Entity EcsNewPair(World *world, Entity a, Entity b);
-Entity EcsPairObject(World *world, Entity pair);
-Entity EcsPairRelation(World *world, Entity pair);
+void EcsRelations(World *world, Entity entity, Entity relation, SystemCb cb);
+#define ECS_CHILDREN(WORLD, PARENT, CB) (EcsRelations((WORLD), (PARENT), EcsChildof, (CB)))
 
 void EcsStep(World *world);
 void EcsQuery(World *world, SystemCb cb, Entity *components, size_t sizeOfComponents);

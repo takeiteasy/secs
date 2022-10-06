@@ -35,6 +35,12 @@ static void moveCb(View *view) {
     moveCbCounter++;
 }
 
+static int childCbCounter = 0;
+static void childCb(View *view) {
+    TEST(!!ECS_FIELD(view, Relation, 0), true);
+    childCbCounter++;
+}
+
 int main(int argc, char *argv[]) {
     World *world = EcsWorld();
     
@@ -110,16 +116,17 @@ int main(int argc, char *argv[]) {
     TEST(ECS_ENTITY_ISA(position, Component), true);
     TEST(ECS_ENTITY_ISA(e5, Component), false);
     
-    EntityPair pair = ECS_PAIR(EcsChildof, e5);
-    TEST(ECS_ENTITY_ISA(pair, Pair), true);
-    Entity pair_e = ECS_PAIR_ENTITY(pair);
-    Entity pair_obj = EcsPairObject(world, pair_e);
-    Entity pair_rel = EcsPairRelation(world, pair_e);
-    TEST(ECS_CMP(pair_obj, EcsChildof), true);
-    TEST(ECS_CMP(pair_rel, e5), true);
-    
-    Entity e6 = EcsNewEntity(world);
-    EcsAttach(world, e6, pair_e);
+    Entity parent = EcsNewEntity(world);
+    Entity child = EcsNewEntity(world);
+    EcsAssociate(world, child, EcsChildof, parent);
+    EcsAssociate(world, e1, EcsChildof, parent);
+    ECS_CHILDREN(world, parent, childCb);
+    TEST(childCbCounter, 2);
+    TEST(EcsHasRelation(world, child, EcsChildof), true);
+    TEST(EcsRelated(world, child, parent), true);
+//  Not working:
+//    EcsDisassociate(world, e1, EcsChildof, parent);
+//    TEST(childCbCounter, 3);
     
     DeleteWorld(&world);
     return 0;

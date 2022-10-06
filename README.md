@@ -7,7 +7,7 @@ _s-ecs_ **[seks]**: A ***s***mall ***e***ntity ***c***omponent ***s***ystem. Wor
 - [X] ~~Queries~~
 - [X] ~~Systems~~
 - [X] ~~Tags~~
-- [ ] Relationships
+- [X] ~~Relationships~~
 - [ ] Pipelines
 - [X] ~~Prefabs~~
 - [ ] Observers
