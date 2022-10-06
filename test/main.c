@@ -124,9 +124,9 @@ int main(int argc, char *argv[]) {
     TEST(childCbCounter, 2);
     TEST(EcsHasRelation(world, child, EcsChildof), true);
     TEST(EcsRelated(world, child, parent), true);
-//  Not working:
-//    EcsDisassociate(world, e1, EcsChildof, parent);
-//    TEST(childCbCounter, 3);
+    EcsDisassociate(world, e1);
+    ECS_CHILDREN(world, parent, childCb);
+    TEST(childCbCounter, 3);
     
     DeleteWorld(&world);
     return 0;

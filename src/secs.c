@@ -359,10 +359,8 @@ void EcsDetach(World *world, Entity entity, Entity component) {
     StorageRemove(storage, entity);
 }
 
-void EcsDisassociate(World *world, Entity entity, Entity object, Entity relation) {
+void EcsDisassociate(World *world, Entity entity) {
     assert(EcsIsValid(world, entity));
-    assert(EcsIsValid(world, object));
-    assert(EcsIsValid(world, relation));
     assert(EcsHas(world, entity, EcsRelation));
     EcsDetach(world, entity, EcsRelation);
 }

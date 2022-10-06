@@ -122,7 +122,7 @@ bool EcsHas(World *world, Entity entity, Entity component);
 void EcsAttach(World *world, Entity entity, Entity component);
 void EcsAssociate(World *world, Entity entity, Entity object, Entity relation);
 void EcsDetach(World *world, Entity entity, Entity component);
-void EcsDisassociate(World *world, Entity entity, Entity object, Entity relation);
+void EcsDisassociate(World *world, Entity entity);
 bool EcsHasRelation(World *world, Entity entity, Entity object);
 bool EcsRelated(World *world, Entity entity, Entity relation);
 void* EcsGet(World *world, Entity entity, Entity component);
