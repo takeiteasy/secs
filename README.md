@@ -1,8 +1,9 @@
 # s-ecs 
-_s-ecs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem using sparse arrays for component storage. **Work in progress!** Currently implemented features are listed below, See [docs](https://takeiteasy.github.io/s-ecs/) and [test/main.c](https://github.com/takeiteasy/s-ecs/blob/master/test/main.c) for more infomation.
+_s-ecs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem using sparse arrays for component storage. **Work in progress!** Currently implemented features are listed below. See [docs](https://takeiteasy.github.io/s-ecs/) and [test/main.c](https://github.com/takeiteasy/s-ecs/blob/master/test/main.c) for more infomation.
 
 ## TODO
-- [X] ~~Create a simple Makefile~~
+- [X] ~~Create a temporary Makefile~~
+- [ ] Create a better Makefile
 - [X] ~~Documentation~~
 - [X] ~~Queries~~
 - [X] ~~Systems~~
