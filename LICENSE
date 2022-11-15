@@ -1,25 +1,3 @@
-# secs 
-_secs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem using sparse arrays for component storage.
-
-**Work in progress!** -- Currently implemented features are listed below. See [docs](https://takeiteasy.github.io/secs/) and [test/main.c](https://github.com/takeiteasy/secs/blob/master/test/main.c) for more infomation.
-
-## TODO
-- [X] ~~Create a temporary Makefile~~
-- [ ] Create a better Makefile
-- [X] ~~Documentation~~
-- [X] ~~Queries~~
-- [X] ~~Systems~~
-- [X] ~~Tags~~
-- [X] ~~Relationships~~
-- [ ] Pipelines
-- [X] ~~Prefabs~~
-- [ ] Observers
-- [ ] Reflection
-- [ ] Rules
-- [ ] Lua wrapper
-
-## LICENSE
-```
 The MIT License (MIT)
 
 Copyright (c) 2022 George Watson
@@ -42,4 +20,3 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
