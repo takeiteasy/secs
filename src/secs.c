@@ -24,8 +24,8 @@
  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #include "secs.h"
-#if defined(DEBUG)
 #include <assert.h>
+#if defined(DEBUG)
 #include <stdio.h>
 #define ASSERT(X) \
     do {                                                                                       \
@@ -43,8 +43,8 @@
         }                                                                                      \
     } while(0)
 #else
-#define ECS_ASSERT(...)
-#define ASSERT(...)
+#define ECS_ASSERT(X, _, __) assert(X)
+#define ASSERT(X) assert(X)
 #endif
 
 #define ECS_COMPOSE_ENTITY(ID, VER, TAG) \

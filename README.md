@@ -5,7 +5,7 @@ _secs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem usin
 
 ## TODO
 - [X] ~~Create a temporary Makefile~~
-- [ ] Create a basic Makefile
+- [X] ~~Create a basic Makefile~~
 - [X] ~~Documentation~~
 - [X] ~~Queries~~
 - [X] ~~Systems~~
