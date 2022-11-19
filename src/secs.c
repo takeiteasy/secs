@@ -233,7 +233,6 @@ World* EcsWorld(void) {
     return result;
 }
 
-#define X(NAME, _) ECS_ID(NAME) = EcsNilEntity;
 ECS_DEFINE_DTOR(World, {
     if (_p->storages)
         for (int i = 0; i < _p->sizeOfStorages; i++)
@@ -241,9 +240,7 @@ ECS_DEFINE_DTOR(World, {
     SAFE_FREE(_p->storages);
     SAFE_FREE(_p->entities);
     SAFE_FREE(_p->recyclable);
-    ECS_BOOTSTRAP
 });
-#undef X
 
 bool EcsIsValid(World *world, Entity e) {
     assert(world);
@@ -301,31 +298,52 @@ Entity EcsNewComponent(World *world, size_t sizeOfComponent) {
     return EcsAssure(world, e, sizeOfComponent) ? e : EcsNilEntity;
 }
 
-Entity EcsNewSystem(World *world, SystemCb fn, Entity *components, size_t sizeOfComponents) {
+Entity EcsNewSystem(World *world, SystemCb fn, size_t sizeOfComponents, ...) {
     Entity e = EcsNewEntityType(world, EcsSystemType);
     EcsAttach(world, e, EcsSystem);
     System *c = EcsGet(world, e, EcsSystem);
     c->callback = fn;
     c->sizeOfComponents = sizeOfComponents;
-    for (int i = 0; i < MAX_ECS_COMPONENTS; i++)
-        c->components[i].parts.id = EcsNil;
-    memcpy(c->components, components, sizeOfComponents * sizeof(Entity));
+    c->components = malloc(sizeof(Entity) * sizeOfComponents);
+    
+    va_list args;
+    va_start(args, sizeOfComponents);
+    for (int i = 0; i < sizeOfComponents; i++)
+        c->components[i] = va_arg(args, Entity);
+    va_end(args);
     return e;
 }
 
-Entity EcsNewPrefab(World *world, Entity *components, size_t sizeOfComponents) {
+Entity EcsNewPrefab(World *world, size_t sizeOfComponents, ...) {
     Entity e = EcsNewEntityType(world, EcsPrefabType);
     EcsAttach(world, e, EcsPrefab);
     Prefab *c = EcsGet(world, e, EcsPrefab);
-    for (int i = 0; i < MAX_ECS_COMPONENTS; i++)
-        (*c)[i] = EcsNilEntity;
-    memcpy(c, components, sizeOfComponents * sizeof(Entity));
+    c->sizeOfComponents = sizeOfComponents;
+    c->components = malloc(sizeof(Entity) * sizeOfComponents);
+    
+    va_list args;
+    va_start(args, sizeOfComponents);
+    for (int i = 0; i < sizeOfComponents; i++)
+        c->components[i] = va_arg(args, Entity);
+    va_end(args);
     return e;
 }
 
 void DeleteEntity(World *world, Entity e) {
     assert(world);
     assert(EcsIsValid(world, e));
+    switch (e.parts.flag) {
+        case EcsSystemType:;
+            System *s = EcsGet(world, e, EcsSystem);
+            if (s && s->components)
+                free(s->components);
+            break;
+        case EcsPrefabType:;
+            Prefab *p = EcsGet(world, e, EcsPrefab);
+            if (p && p->components)
+                free(p->components);
+            break;
+    }
     for (size_t i = world->sizeOfStorages; i; --i)
         if (world->storages[i - 1] && SparseHas(world->storages[i - 1]->sparse, e))
             StorageRemove(world->storages[i - 1], e);
@@ -342,10 +360,10 @@ void EcsAttach(World *world, Entity entity, Entity component) {
             assert(false);
         case EcsPrefabType: {
             Prefab *c = EcsGet(world, component, EcsPrefab);
-            for (int i = 0; i < MAX_ECS_COMPONENTS; i++) {
-                if (ENTITY_IS_NIL((*c)[i]))
+            for (int i = 0; i < c->sizeOfComponents; i++) {
+                if (ENTITY_IS_NIL(c->components[i]))
                     break;
-                EcsAttach(world, entity, (*c)[i]);
+                EcsAttach(world, entity, c->components[i]);
             }
             break;
         }

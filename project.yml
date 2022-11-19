@@ -4,7 +4,7 @@ options:
   bundleIdPrefix: io.github.takeiteasy
   createIntermediateGroups: true
   deploymentTarget:
-    macOS: "10.9"
+    macOS: "12.0"
 
 settings:
   GCC_C_LANGUAGE_STANDARD: c11
@@ -17,5 +17,5 @@ targets:
     info:
       path: Info.plist
     sources:
-      - path: src 
-      - path: test
+      - path: src/
+      - path: tests/
