@@ -40,6 +40,8 @@ typedef enum bool { false = 0, true = !false } bool;
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Taken from: https://gist.github.com/61131/7a22ac46062ee292c2c8bd6d883d28de
 #define N_ARGS(...) _NARG_(__VA_ARGS__, _RSEQ())
@@ -66,23 +68,6 @@ typedef union {
     uint64_t id;
 } Entity;
 
-/*!
- * @defined ECS_COMPOSE_ENTITY
- * @abstract Compose an entity from given parts
- * @param ID 32-bit unique identifier
- * @param VER Entity generation
- * @param TAG Entity type flag
- * @return New Entity object
- */
-#define ECS_COMPOSE_ENTITY(ID, VER, TAG) \
-    (Entity)                             \
-    {                                    \
-        .parts = {                       \
-            .id = ID,                    \
-            .version = VER,              \
-            .flag = TAG                  \
-        }                                \
-    }
 /*!
  * @defined ENTITY_ID
  * @abstract Get Entity unique 32-bit id
@@ -198,6 +183,14 @@ typedef struct {
  */
 #define ECS_PREFAB(WORLD, ...) EcsNewPrefab(WORLD, N_ARGS(__VA_ARGS__), __VA_ARGS__)
 /*!
+ * @defined ECS_CHILDREN
+ * @abstract Convenience wrapper for EcsRelation to find all entities with relation of EcsChildOf
+ * @param WORLD ECS World instance
+ * @param PARENT Parent entity
+ * @param CB Query callback
+ */
+#define ECS_CHILDREN(WORLD, PARENT, CB) (EcsRelations((WORLD), (PARENT), EcsChildof, (CB)))
+/*!
  * @defined ENTITY_ISA
  * @abstract Check the type of an entity
  * @param E Entity object to check
@@ -207,12 +200,6 @@ typedef struct {
 #define ENTITY_ISA(E, TYPE) ((E).parts.flag == Ecs##TYPE##Type)
 
 /*!
- * @defined MAX_ECS_COMPONENTS
- * @internal
- */
-#define MAX_ECS_COMPONENTS 16
-
-/*!
  * @struct View
  * @abstract Structure to hold all components for an entity (used for queries)
  * @field componentData Array of component data
@@ -220,8 +207,9 @@ typedef struct {
  * @field entityId Entity ID components belong to
  */
 typedef struct {
-    void *componentData[MAX_ECS_COMPONENTS];
-    Entity componentIndex[MAX_ECS_COMPONENTS];
+    void **componentData;
+    Entity *componentIndex;
+    size_t sizeOfComponentData;
     Entity entityId;
 } View;
 
@@ -443,14 +431,6 @@ void EcsSet(World *world, Entity entity, Entity component, const void *data);
  * @param cb Query callback
  */
 void EcsRelations(World *world, Entity entity, Entity relation, SystemCb cb);
-/*!
- * @defined ECS_CHILDREN
- * @abstract Convenience wrapper for EcsRelation to find all entities with relation of EcsChildOf
- * @param WORLD ECS World instance
- * @param PARENT Parent entity
- * @param CB Query callback
- */
-#define ECS_CHILDREN(WORLD, PARENT, CB) (EcsRelations((WORLD), (PARENT), EcsChildof, (CB)))
 
 /*!
  * @function EcsStep
