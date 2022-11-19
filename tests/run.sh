@@ -7,17 +7,20 @@ failures=0
 for exe in "$@"
 do
     ((count++))
-    printf " * #$count ($exe)..."
+    echo " * Running test #$count ($exe)..."
+    eval "./$exe"
     if [ $? = 0 ]; then
-        echo "[SUCCESS]"
+        printf " * #$count \e[0;32m[SUCCESS]\e[m\n"
         ((successes++))
     else
-        echo "[FAILED]"
+        printf " * #$count \e[0;31m[FAILED]\e[m\n"
         ((failures++))
     fi
 done
 if [ $failures = 0 ]; then
     echo "ALL TESTS COMPLETED SUCCESSFULLY"
+    exit 0
 else
     echo "#$count tests run, $failures failed"
+    exit 1
 fi

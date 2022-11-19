@@ -9,7 +9,6 @@
 #define test_h
 #include "secs.h"
 #include <stdio.h>
-#include <assert.h>
 
 static int TEST_COUNTER = 0;
 #define TEST(OBJECT, RESULT)                                                                              \
@@ -17,7 +16,8 @@ static int TEST_COUNTER = 0;
     {                                                                                                     \
         bool res = (OBJECT) == (RESULT);                                                                  \
         printf("[TEST%02d:%s] %s == %s\n", ++TEST_COUNTER, res ? "SUCCESS" : "FAILED", #OBJECT, #RESULT); \
-        assert(false);                                                                                    \
+        if (!res)                                                                                         \
+            exit(EXIT_FAILURE);                                                                           \
     } while (0)
 
 #endif /* test_h */

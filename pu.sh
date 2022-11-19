@@ -5,9 +5,9 @@ cd tests/
 make all
 SUCCESS=$?
 cd ../
-if [[ $RET -eq 0 ]];
+if [ $SUCCESS -eq 0 ];
 then
-    echo "GOOD TO GO!"
+    printf "\e[0;32mGOOD TO GO!\e[m\n"
 else
-    echo "FIX YOUR SHIT!"
+    printf "\e[0;31mFIX YOUR SHIT!\e[m\n"
 fi
