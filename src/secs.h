@@ -25,6 +25,12 @@
 
 #ifndef secs_h
 #define secs_h
+
+/*!
+ * @header secs -- Simple Entity Component System
+ * @copyright George Watson
+ */
+
 #if defined(_MSC_VER) && _MSC_VER < 1800
 #include <windef.h>
 #define bool BOOL
@@ -52,10 +58,11 @@ typedef enum bool { false = 0, true = !false } bool;
 /*!
  * @union Entity
  * @abstract An entity represents a general-purpose object
- * @field parts.id 32-bit unique identifier
- * @field parts.version Entity generation
- * @field parts.unsed 16-bit unused
- * @field parts.flag Entity type flag
+ * @field parts Struct containing entity information
+ * @field id 32-bit unique identifier
+ * @field version Entity generation
+ * @field unused 16-bit unused
+ * @field flag Entity type flag
  * @field id Full entity identifier
  */
 typedef union {
@@ -204,6 +211,7 @@ typedef struct {
  * @abstract Structure to hold all components for an entity (used for queries)
  * @field componentData Array of component data
  * @field componentIndex Indexes for componentData
+ * @field sizeOfComponentData Size of component data and index arrays
  * @field entityId Entity ID components belong to
  */
 typedef struct {
@@ -216,8 +224,9 @@ typedef struct {
 /*!
  * @typedef SystemCb
  * @abstract Typedef for System callbacks
+ * @param view Struct containing component data
  */
-typedef void(*SystemCb)(View*);
+typedef void(*SystemCb)(View* view);
 /*!
  * @struct Prefab
  * @abstract Prefab component type (Array of component IDs)
@@ -315,8 +324,8 @@ Entity EcsNewComponent(World *world, size_t sizeOfComponent);
  * @abstract Register a new system in the ECS
  * @param world ECS World instance
  * @param fn System callback function
- * @param components Array of component IDs
  * @param sizeOfComponents Length of component array
+ * @param ... Component IDs
  * @return System Entity object
  */
 Entity EcsNewSystem(World *world, SystemCb fn, size_t sizeOfComponents, ...);
@@ -324,8 +333,8 @@ Entity EcsNewSystem(World *world, SystemCb fn, size_t sizeOfComponents, ...);
  * @function EcsNewPrefab
  * @abstract Register a new prefab in the ECS
  * @param world ECS World instance
- * @param components Array of component IDs
  * @param sizeOfComponents Length of component array
+ * @param ... Component IDs
  * @return Prefab Entity object
  */
 Entity EcsNewPrefab(World *world, size_t sizeOfComponents, ...);
@@ -342,7 +351,7 @@ void DeleteEntity(World *world, Entity entity);
  * @abstract Check if Entity ID is in range and generation corrosponds with entity generation in the index
  * @param world ECS World instance
  * @param entity Entity to check
- * @param boolean
+ * @return Boolean
  */
 bool EcsIsValid(World *world, Entity entity);
 /*!
@@ -351,7 +360,7 @@ bool EcsIsValid(World *world, Entity entity);
  * @param world ECS World instance
  * @param entity Entity to check
  * @param component Component ID to check
- * @param return boolean
+ * @return Boolean
  */
 bool EcsHas(World *world, Entity entity, Entity component);
 /*!
@@ -401,7 +410,7 @@ bool EcsHasRelation(World *world, Entity entity, Entity object);
  * @param world ECS World instance
  * @param entity Entity with suspected relation
  * @param relation Potentially related entity
- * @return boolean
+ * @return Boolean
  */
 bool EcsRelated(World *world, Entity entity, Entity relation);
 /*!
