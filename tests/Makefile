@@ -34,11 +34,9 @@ endif
 clean:
 	rm $(OUTS)
 
-rebuild: clean default
-
 run:
 	sh run.sh $(OUTS)
 
 all: default run clean
 
-.PHONY: default clean rebuild run all
+.PHONY: default clean run all

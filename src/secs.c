@@ -233,14 +233,32 @@ World* EcsWorld(void) {
     return result;
 }
 
+#define DEL_TYPES \
+    X(System, 0)  \
+    X(Prefab, 1)
+
+#define X(TYPE, N)                                                       \
+    case N: {                                                            \
+        for (int j = 0; j < storage->sparse->sizeOfDense; j++) {         \
+            TYPE *type = StorageGet(storage, storage->sparse->dense[j]); \
+            free(type->components);                                      \
+        }                                                                \
+        break;                                                           \
+    }
 ECS_DEFINE_DTOR(World, {
     if (_p->storages)
-        for (int i = 0; i < _p->sizeOfStorages; i++)
-            DeleteEcsStorage(&_p->storages[i]);
+        for (int i = 0; i < _p->sizeOfStorages; i++) {
+            EcsStorage *storage = _p->storages[i];
+            switch (i) {
+                DEL_TYPES
+            }
+            DeleteEcsStorage(&storage);
+        }
     SAFE_FREE(_p->storages);
     SAFE_FREE(_p->entities);
     SAFE_FREE(_p->recyclable);
 });
+#undef X
 
 bool EcsIsValid(World *world, Entity e) {
     assert(world);
@@ -333,16 +351,15 @@ void DeleteEntity(World *world, Entity e) {
     assert(world);
     assert(EcsIsValid(world, e));
     switch (e.parts.flag) {
-        case EcsSystemType:;
-            System *s = EcsGet(world, e, EcsSystem);
-            if (s && s->components)
-                free(s->components);
-            break;
-        case EcsPrefabType:;
-            Prefab *p = EcsGet(world, e, EcsPrefab);
-            if (p && p->components)
-                free(p->components);
-            break;
+#define X(TYPE, _)                                 \
+        case Ecs##TYPE##Type: {                    \
+            TYPE *s = EcsGet(world, e, Ecs##TYPE); \
+            if (s && s->components)                \
+                free(s->components);               \
+            break;                                 \
+        }
+        DEL_TYPES
+#undef X
     }
     for (size_t i = world->sizeOfStorages; i; --i)
         if (world->storages[i - 1] && SparseHas(world->storages[i - 1]->sparse, e))
