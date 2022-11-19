@@ -6,7 +6,7 @@ endif
 
 LDFLAGS :=
 CFLAGS_INC :=
-CFLAGS := -g -Wall $(CFLAGS_INC)
+CFLAGS := -I../src -g -Wall $(CFLAGS_INC)
 
 SRCS := $(wildcard *.c)
 PRGS := $(patsubst %.c,%,$(SRCS))
@@ -19,7 +19,7 @@ else
 	OUTS = $(BINS)
 endif
 
-default: $(BINS) run
+default: $(BINS)
 
 .SECONDEXPANSION:
 OBJ = $(patsubst %$(PRG_SUFFIX),%.o,$@)
@@ -29,13 +29,16 @@ else
 	BIN = $@
 endif
 %$(PRG_SUFFIX): $(OBJS)
-	$(CC) $(OBJ)  $(LDFLAGS) -o $(BIN)
+	$(CC) ../src/secs.c $(OBJ) $(LDFLAGS) -o $(BIN)
 
 clean:
 	rm $(OUTS)
+
 rebuild: clean default
 
 run:
 	sh run.sh $(OUTS)
 
-.PHONY: default clean rebuild run
+all: default run clean
+
+.PHONY: default clean rebuild run all
