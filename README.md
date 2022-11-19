@@ -1,7 +1,7 @@
 # secs 
 _secs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem using sparse arrays for component storage.
 
-**Work in progress!** -- Currently implemented features are listed below. See [docs](https://takeiteasy.github.io/secs/) and [tests/main.c](https://github.com/takeiteasy/secs/blob/master/tests/main.c) for more infomation.
+**Work in progress!** -- Currently implemented features are listed below. See [docs](https://takeiteasy.github.io/secs/) and [tests](https://github.com/takeiteasy/secs/blob/master/tests/) for more infomation.
 
 ## TODO
 - [X] ~~Create a temporary Makefile~~

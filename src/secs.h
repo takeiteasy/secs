@@ -27,7 +27,7 @@
 #define secs_h
 
 /*!
- * @header secs -- Simple Entity Component System
+ * @header secs Simple Entity Component System
  * @copyright George Watson
  */
 
@@ -63,7 +63,6 @@ typedef enum bool { false = 0, true = !false } bool;
  * @field version Entity generation
  * @field unused 16-bit unused
  * @field flag Entity type flag
- * @field id Full entity identifier
  */
 typedef union {
     struct {
