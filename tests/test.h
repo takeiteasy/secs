@@ -7,7 +7,8 @@
 
 #ifndef test_h
 #define test_h
-#include "secs.h"
+#define SECS_IMPLEMENTATION
+#include "tmp.h"
 #include <stdio.h>
 
 static int TEST_COUNTER = 0;
