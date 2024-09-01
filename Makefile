@@ -6,9 +6,9 @@ endif
 
 LDFLAGS :=
 CFLAGS_INC :=
-CFLAGS := -I../src -g -Wall $(CFLAGS_INC)
+CFLAGS := -I. -g -Wall $(CFLAGS_INC)
 
-SRCS := $(wildcard *.c)
+SRCS := $(wildcard tests/*.c)
 PRGS := $(patsubst %.c,%,$(SRCS))
 PRG_SUFFIX=.exe
 BINS := $(patsubst %,%$(PRG_SUFFIX),$(PRGS))
@@ -29,7 +29,7 @@ else
 	BIN = $@
 endif
 %$(PRG_SUFFIX): $(OBJS)
-	$(CC) ../src/secs.c $(OBJ) $(LDFLAGS) -o $(BIN)
+	$(CC) $(OBJ) $(LDFLAGS) -o $(BIN)
 
 clean:
 	rm $(OUTS)

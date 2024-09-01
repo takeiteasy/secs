@@ -38,6 +38,7 @@
 #endif
 #include <stdint.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 typedef union {
     struct {
@@ -62,8 +63,10 @@ typedef struct ecs world_t;
 
 #ifndef SECS_NO_BLOCKS
 typedef void(^ecs_callback_t)(entity_t);
+typedef bool(^ecs_filter_t)(entity_t);
 #else
 typedef void(*ecs_callback_t)(entity_t);
+typedef bool(*ecs_filter_t)(entity_t);
 #endif
 
 world_t* ecs_create(void);
@@ -77,7 +80,7 @@ bool ecs_isvalid(world_t *world, entity_t entity);
 bool ecs_isnil(entity_t entity);
 
 entity_t ecs_component(world_t *world, size_t component_size);
-entity_t ecs_system(world_t *world, ecs_callback_t callback, int component_count, ...);
+entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...);
 
 void* ecs_attach(world_t *world, entity_t entity, entity_t component);
 bool ecs_has(world_t *world, entity_t entity, entity_t component);
@@ -86,7 +89,7 @@ void* ecs_get(world_t *world, entity_t entity, entity_t component);
 void ecs_set(world_t *world, entity_t entity, entity_t component, void *data);
 
 void ecs_step(world_t *world);
-void ecs_query(world_t *world, ecs_callback_t callback, int component_count, ...);
+void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...);
 
 #endif // SECS_HEADER
 
@@ -480,13 +483,11 @@ static uint32_t* find(storage_t *map, uint64_t x, int ensure) {
     }
 }
 
-static storage_t* make_storage(storage_t *old, size_t capacity) {
+static storage_t* make_storage(void) {
     storage_t *result = malloc(sizeof(storage_t));
-    if (!capacity)
-        capacity = 8;
-    result->capacity = capacity;
+    result->capacity = 8;
     result->count = 0;
-    result->tree = imap_ensure(NULL, capacity);
+    result->tree = imap_ensure(NULL, 8);
     return result;
 }
 
@@ -581,12 +582,12 @@ static entity_t make_entity(world_t *world, enum ecs_entity_type type) {
         entity_t old = entity_array_pop(&world->recyclable);
         entity_t copy = entity_storage_get(world->entities, old.id);
         copy.alive = 1;
+        copy.type = type;
         entity_storage_set(world->entities, copy.id, copy);
         return copy;
     } else {
-        world->entities = realloc(world->entities, ++world->entity_count * sizeof(entity_t));
         entity_t e = (entity_t) {
-            .id = (uint32_t)world->entity_count-1,
+            .id = (uint32_t)world->entity_count++,
             .version = 0,
             .alive = 1,
             .type = type
@@ -600,15 +601,17 @@ world_t* ecs_create(void) {
     world_t *world = malloc(sizeof(world_t));
     memset(world, 0, sizeof(world_t));
     world->next_id = ecs_nil;
-    world->entities = make_storage(NULL, 0);
-    world->components = make_storage(NULL, 0);
-    world->systems = make_storage(NULL, 0);
+    world->entities = make_storage();
+    world->components = make_storage();
+    world->systems = make_storage();
     return world;
 }
 
 void ecs_destroy(world_t *world) {
     destroy_storage(world->entities);
     destroy_entity_array(&world->recyclable);
+    destroy_storage(world->components);
+    destroy_storage(world->systems);
     free(world);
 }
 
@@ -623,6 +626,7 @@ typedef struct {
 
 typedef struct {
     ecs_callback_t callback;
+    ecs_filter_t filter;
     entity_array_t components;
 } system_data;
 
@@ -683,13 +687,13 @@ entity_t ecs_component(world_t *world, size_t component_size) {
         free(found);
     }
     component_data *cd = malloc(sizeof(component_data));
-    cd->data = make_storage(NULL, 0);
+    cd->data = make_storage();
     cd->data_size = component_size;
     storage_set(world->components, component.id, cd);
     return component;
 }
 
-entity_t ecs_system(world_t *world, ecs_callback_t callback, int component_count, ...) {
+entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
     entity_t system = make_entity(world, ECS_TYPE_SYSTEM);
     void *found = storage_get(world->systems, system.id);
     if (found) {
@@ -700,6 +704,7 @@ entity_t ecs_system(world_t *world, ecs_callback_t callback, int component_count
     }
     system_data *sd = malloc(sizeof(system_data));
     sd->callback = callback;
+    sd->filter = filter;
     memset(&sd->components, 0, sizeof(entity_array_t));
     va_list args;
     va_start(args, component_count);
@@ -802,15 +807,19 @@ void ecs_step(world_t *world) {
             break;
         system_data *sd = (system_data*)imap_getval(world->systems->tree, pair.slot);
         entity_array_t *entities = query(world, &sd->components);
-        for (int i = 0; i < entities->entity_count; i++)
+        for (int i = 0; i < entities->entity_count; i++) {
+            if (sd->filter)
+                if (!sd->filter(entities->entities[i]))
+                    continue;
             sd->callback(entities->entities[i]);
+        }
         destroy_entity_array(entities);
         free(entities);
         pair = imap_iterate(world->systems->tree, &iter, 0);
     }
 }
 
-void ecs_query(world_t *world, ecs_callback_t callback, int component_count, ...) {
+void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
     entity_array_t arr;
     memset(&arr, 0, sizeof(entity_array_t));
     va_list args;

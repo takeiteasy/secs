@@ -3,7 +3,7 @@
 > [!WARNING]
 > **Work in progress!** -- Currently implemented features are listed below
 
-`secs` stands for ***s***imple ***e***ntity ***c***omponent ***s***ystem. It uses sparse arrays for component storage.
+`secs` stands for ***s***imple ***e***ntity ***c***omponent ***s***ystem.
 
 ## TODO
 

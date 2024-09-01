@@ -15,7 +15,9 @@ targets:
     type: tool 
     platform: macOS
     sources:
-      - path: src/
+      - path: secs.h
+      - path: Makefile
+        type: folder
       - path: tests/main.c
       - path: tests/
         type: folder
