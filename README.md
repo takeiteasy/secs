@@ -5,6 +5,44 @@
 
 `secs` stands for ***s***imple ***e***ntity ***c***omponent ***s***ystem.
 
+```c
+#define SECS_IMPLEMENTATION
+#include "secs.h"
+#include <stdio.h>
+
+typedef struct {
+    float x;
+    float y;
+} Position;
+
+static void dump_entity(entity_t e) {
+    printf("(%llx: {%d, %d, %d, %d})\n", e.value, e.id, e.version, e.alive, e.type);
+}
+
+int main(int argc, const char *argv[]) {
+    world_t *world = ecs_create();
+    
+    entity_t regular = ecs_spawn(world);
+    
+    entity_t position_component = ecs_component(world, sizeof(Position));
+    
+    entity_t system = ecs_system(world, ^(entity_t e) {
+        Position *pos = ecs_get(world, e, position_component);
+        pos->x = 1;
+        pos->y = 2;
+    }, NULL, 1, position_component);
+    
+    ecs_step(world);
+    
+    Position *pos = ecs_get(world, entity, position_component);
+    printf("%.2f, %.2f\n", pos->x, pos->y);
+    // 1.00, 2.000
+    
+    ecs_destroy(world);
+    return 1;
+}
+```
+
 ## TODO
 
 - [ ] Documentation + tests
@@ -18,6 +56,10 @@
 - [ ] Observers
 - [ ] Reflection
 - [ ] Rules
+
+## Acknowledgements
+
+- Built using [imap](https://github.com/billziss-gh/imap), an exellent int->int map
 
 ## LICENSE
 ```
