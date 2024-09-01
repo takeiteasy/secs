@@ -11,8 +11,8 @@
 - [X] Entities+Components
 - [X] Queries
 - [X] Systems
-- [X] Tags
-- [X] Prefabs
+- [ ] Tags
+- [ ] Prefabs
 - [ ] Relationships
 - [ ] Pipelines
 - [ ] Observers
