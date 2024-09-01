@@ -1,22 +1,23 @@
 # secs 
-_secs_ **[seks]**: A ***s***imple ***e***ntity ***c***omponent ***s***ystem using sparse arrays for component storage.
 
-**Work in progress!** -- Currently implemented features are listed below. See [docs](https://takeiteasy.github.io/secs/) and [tests](https://github.com/takeiteasy/secs/blob/master/tests/) for more infomation.
+> [!WARNING]
+> **Work in progress!** -- Currently implemented features are listed below
+
+`secs` stands for ***s***imple ***e***ntity ***c***omponent ***s***ystem. It uses sparse arrays for component storage.
 
 ## TODO
-- [X] ~~Create a temporary Makefile~~
-- [X] ~~Create a basic Makefile~~
-- [X] ~~Documentation~~
-- [X] ~~Queries~~
-- [X] ~~Systems~~
-- [X] ~~Tags~~
-- [X] ~~Relationships~~
+
+- [ ] Documentation + tests
+- [X] Entities+Components
+- [X] Queries
+- [X] Systems
+- [X] Tags
+- [X] Prefabs
+- [ ] Relationships
 - [ ] Pipelines
-- [X] ~~Prefabs~~
 - [ ] Observers
 - [ ] Reflection
 - [ ] Rules
-- [ ] Lua wrapper
 
 ## LICENSE
 ```

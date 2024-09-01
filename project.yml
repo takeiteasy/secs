@@ -16,4 +16,10 @@ targets:
     platform: macOS
     sources:
       - path: src/
+      - path: tests/main.c
       - path: tests/
+        type: folder
+      - path: README.md
+        type: folder
+      - path: project.yml
+        type: folder
