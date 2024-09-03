@@ -7,6 +7,7 @@
 
 ```c
 #define SECS_IMPLEMENTATION
+// #define SECS_NO_BLOCKS // Disables blocks, use callbacks instead
 #include "secs.h"
 #include <stdio.h>
 
