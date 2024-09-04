@@ -98,6 +98,8 @@ void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef IMAP_IMPLEMENTATION
+#define IMAP_IMPLEMENTATION
 typedef struct {
     union {
         uint32_t vec32[16];
@@ -424,13 +426,14 @@ static imap_pair_t imap_iterate(imap_node_t *tree, imap_iter_t *iter, int restar
     }
     return imap__pair_zero__;
 }
+#endif // IMAP_IMPLEMENTATION
 
 typedef struct {
     imap_node_t *tree;
     size_t count, capacity;
 } storage_t;
 
-static uint32_t* find(storage_t *map, uint64_t x, int ensure) {
+static uint32_t* storage_find(storage_t *map, uint64_t x, int ensure) {
     uint32_t *slotstack[16 + 1];
     uint32_t posnstack[16 + 1];
     uint32_t stackp, stacki;
@@ -492,7 +495,7 @@ static storage_t* make_storage(void) {
 }
 
 static int storage_set(storage_t *map, uint64_t key, void *item) {
-    uint32_t *slot = find(map, key, 1);
+    uint32_t *slot = storage_find(map, key, 1);
     if (!slot)
         return 0;
     imap_setval64(map->tree, slot, (uint64_t)item);
@@ -500,14 +503,14 @@ static int storage_set(storage_t *map, uint64_t key, void *item) {
 }
 
 static void* storage_get(storage_t *map, uint64_t key) {
-    uint32_t *slot = find(map, key, 0);
+    uint32_t *slot = storage_find(map, key, 0);
     return slot ? (void*)imap_getval(map->tree, slot) : NULL;
 }
 
 static void* storage_del(storage_t *map, uint64_t key) {
     if (!map->count)
         return NULL;
-    uint32_t *slot = find(map, key, 0);
+    uint32_t *slot = storage_find(map, key, 0);
     if (!slot)
         return NULL;
     void* val = (void*)imap_getval(map->tree, slot);
