@@ -89,6 +89,8 @@ void* ecs_get(world_t *world, entity_t entity, entity_t component);
 void ecs_set(world_t *world, entity_t entity, entity_t component, void *data);
 
 void ecs_step(world_t *world);
+
+entity_t* ecs_find(world_t *world, ecs_filter_t filter, int *result_count, int component_count, ...);
 void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...);
 
 #endif // SECS_HEADER
@@ -533,11 +535,6 @@ static entity_t entity_storage_get(storage_t *map, uint64_t key) {
     return result ? (entity_t){.value=(uint64_t)result} : ecs_nil_entity;
 }
 
-static entity_t entity_storage_del(storage_t *map, uint64_t key) {
-    void *result = storage_del(map, key);
-    return result ? (entity_t){.value=(uint64_t)result} : ecs_nil_entity;
-}
-
 typedef struct {
     entity_t *entities;
     size_t entity_count;
@@ -553,16 +550,6 @@ static entity_t entity_array_pop(entity_array_t *arr) {
         return ecs_nil_entity;
     entity_t entity = arr->entities[arr->entity_count-1];
     arr->entities = realloc(arr->entities, --arr->entity_count * sizeof(entity_t));
-    return entity;
-}
-
-static entity_t entity_array_pop_at(entity_array_t *arr, int idx) {
-    if (idx < 0 || idx >= arr->entity_count)
-        return ecs_nil_entity;
-    entity_t entity = arr->entities[idx];
-    memmove(&arr->entities[idx], &arr->entities[idx + 1], (arr->entity_count - idx - 1) * sizeof(entity_t));
-    arr->entity_count--;
-    arr->entities = realloc(arr->entities, arr->entity_count * sizeof(entity_t));
     return entity;
 }
 
@@ -770,9 +757,7 @@ void ecs_set(world_t *world, entity_t entity, entity_t component, void *data) {
     memcpy(dst, data, cd->data_size);
 }
 
-entity_array_t* query(world_t *world, entity_array_t *components) {
-    entity_array_t *result = malloc(sizeof(entity_array_t));
-    memset(result, 0, sizeof(entity_array_t));
+static void query(world_t *world, entity_array_t *components, entity_array_t *out) {
     component_data **storages = malloc(components->entity_count * sizeof(component_data*));
     for (int i = 0; i < components->entity_count; i++) {
         assert(ecs_isa(world, components->entities[i], ECS_TYPE_COMPONENT));
@@ -795,11 +780,11 @@ entity_array_t* query(world_t *world, entity_array_t *components) {
                 }
             }
             if (add_to_array)
-                entity_array_append(result, entity);
+                entity_array_append(out, entity);
         }
         pair = imap_iterate(world->entities->tree, &iter, 0);
     }
-    return result;
+    free(storages);
 }
 
 void ecs_step(world_t *world) {
@@ -809,36 +794,54 @@ void ecs_step(world_t *world) {
         if (!pair.slot)
             break;
         system_data *sd = (system_data*)imap_getval(world->systems->tree, pair.slot);
-        entity_array_t *entities = query(world, &sd->components);
-        for (int i = 0; i < entities->entity_count; i++) {
+        entity_array_t entities;
+        query(world, &sd->components, &entities);
+        for (int i = 0; i < entities.entity_count; i++) {
             if (sd->filter)
-                if (!sd->filter(entities->entities[i]))
+                if (!sd->filter(entities.entities[i]))
                     continue;
-            sd->callback(entities->entities[i]);
+            sd->callback(entities.entities[i]);
         }
-        destroy_entity_array(entities);
-        free(entities);
+        destroy_entity_array(&entities);
         pair = imap_iterate(world->systems->tree, &iter, 0);
     }
 }
 
-void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
-    entity_array_t arr;
-    memset(&arr, 0, sizeof(entity_array_t));
-    va_list args;
-    va_start(args, component_count);
-    for (int i = 0; i < component_count; i++) {
+static void components_to_array(world_t *world, entity_array_t *out, int n, va_list args) {
+    for (int i = 0; i < n; i++) {
         entity_t component = va_arg(args, entity_t);
         assert(ecs_isa(world, component, ECS_TYPE_COMPONENT));
-        entity_array_append(&arr, component);
+        entity_array_append(out, component);
     }
     va_end(args);
+}
+
+entity_t* ecs_find(world_t *world, ecs_filter_t filter, int *result_count, int component_count, ...) {
+    entity_array_t components;
+    va_list args;
+    va_start(args, component_count);
+    components_to_array(world, &components, component_count, args);
     
-    entity_array_t *entities = query(world, &arr);
-    for (int i = 0; i < entities->entity_count; i++)
-        callback(entities->entities[i]);
-    destroy_entity_array(&arr);
-    destroy_entity_array(entities);
-    free(entities);
+    entity_array_t tmp;
+    query(world, &components, &tmp);
+    if (result_count)
+        *result_count = (int)tmp.entity_count;
+    destroy_entity_array(&components);
+    return tmp.entities;
+}
+
+void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
+    entity_array_t components;
+    memset(&components, 0, sizeof(entity_array_t));
+    va_list args;
+    va_start(args, component_count);
+    components_to_array(world, &components, component_count, args);
+    
+    entity_array_t entities;
+    query(world, &components, &entities);
+    for (int i = 0; i < entities.entity_count; i++)
+        callback(entities.entities[i]);
+    destroy_entity_array(&components);
+    destroy_entity_array(&entities);
 }
 #endif // SECS_IMPLEMENTATION
