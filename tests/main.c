@@ -40,12 +40,12 @@ int main(int argc, const char *argv[]) {
     entity_t c1 = ecs_component(world, sizeof(Position));
     assert(ecs_isa(world, c1, ECS_TYPE_COMPONENT));
     assert(!ecs_has(world, e1, c1));
-    ecs_attach(world, e1, c1);
+    ecs_give(world, e1, c1);
     assert(ecs_has(world, e1, c1));
-    ecs_detach(world, e1, c1);
+    ecs_remove(world, e1, c1);
     assert(!ecs_has(world, e1, c1));
     
-    ecs_attach(world, e2, c1);
+    ecs_give(world, e2, c1);
     assert(ecs_has(world, e2, c1));
     __block int n = 0;
     entity_t s1 = ecs_system(world, ^(entity_t e) {
@@ -65,8 +65,8 @@ int main(int argc, const char *argv[]) {
     
     entity_t c2 = ecs_component(world, sizeof(Position3D));
     assert(ecs_isa(world, c2, ECS_TYPE_COMPONENT));
-    ecs_attach(world, e2, c2);
-    ecs_attach(world, e4, c1);
+    ecs_give(world, e2, c2);
+    ecs_give(world, e4, c1);
     
     entity_t s2 = ecs_system(world, ^(entity_t e) {
         assert(ecs_cmp(e, e4));
@@ -77,6 +77,23 @@ int main(int argc, const char *argv[]) {
     
     ecs_step(world);
     
+    ecs_disable(world, s2);
+    
+    ecs_step(world);
+    
+    ecs_enable(world, s2);
+    
+    ecs_step(world);
+    
+    entity_t e5 = ecs_spawn(world);
+    entity_t e6 = ecs_spawn(world);
+    entity_t t1 = ecs_tag(world);
+    ecs_give(world, e5, t1);
+    ecs_give(world, e6, t1);
+    assert(ecs_has(world, e5, t1) && ecs_has(world, e6, t1));
+    ecs_remove(world, e6, t1);
+    assert(ecs_has(world, e5, t1) && ecs_has(world, e6, t1));
+
     ecs_destroy(world);
     return 0;
 }

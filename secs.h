@@ -78,13 +78,16 @@ bool ecs_isvalid(world_t *world, entity_t entity);
 bool ecs_isnil(entity_t entity);
 
 entity_t ecs_component(world_t *world, size_t component_size);
+entity_t ecs_tag(world_t *world);
 entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...);
 
-void* ecs_attach(world_t *world, entity_t entity, entity_t component);
+void* ecs_give(world_t *world, entity_t entity, entity_t component);
 bool ecs_has(world_t *world, entity_t entity, entity_t component);
-void ecs_detach(world_t *world, entity_t entity, entity_t component);
+void ecs_remove(world_t *world, entity_t entity, entity_t component);
 void* ecs_get(world_t *world, entity_t entity, entity_t component);
 void ecs_set(world_t *world, entity_t entity, entity_t component, void *data);
+void ecs_disable(world_t *world, entity_t entity);
+void ecs_enable(world_t *world, entity_t entity);
 
 void ecs_step(world_t *world);
 
@@ -536,24 +539,39 @@ static entity_t entity_storage_get(storage_t *map, uint64_t key) {
 typedef struct {
     entity_t *entities;
     size_t entity_count;
-} entity_array_t;
+    size_t capacity;
+} entity_array;
 
-static void entity_array_append(entity_array_t *arr, entity_t entity) {
-    arr->entities = realloc(arr->entities, ++arr->entity_count * sizeof(entity_t));
-    arr->entities[arr->entity_count-1] = entity;
+static void entity_array_resize(entity_array *arr, size_t new_size) {
+    assert((arr->entities = realloc(arr->entities, (arr->capacity = new_size) * sizeof(entity_t))));
 }
 
-static entity_t entity_array_pop(entity_array_t *arr) {
+static void entity_array_init(entity_array *arr, size_t initial_size) {
+    if (!initial_size)
+        initial_size = 8;
+    assert((arr->entities = malloc((arr->capacity = initial_size) * sizeof(entity_t))));
+    arr->entity_count = 0;
+}
+
+static void entity_array_append(entity_array *arr, entity_t entity) {
+    if (arr->entity_count == arr->capacity)
+        entity_array_resize(arr, arr->capacity * 2);
+    arr->entities[arr->entity_count++] = entity;
+}
+
+static entity_t entity_array_pop(entity_array *arr) {
     if (!arr->entities || !arr->entity_count)
         return ecs_nil_entity;
-    entity_t entity = arr->entities[arr->entity_count-1];
-    arr->entities = realloc(arr->entities, --arr->entity_count * sizeof(entity_t));
+    entity_t entity = arr->entities[--arr->entity_count];
+    if (arr->capacity >= arr->entity_count * 2)
+        entity_array_resize(arr, arr->entity_count);
     return entity;
 }
 
-void destroy_entity_array(entity_array_t *arr) {
+void destroy_entity_array(entity_array *arr) {
     if (arr->entities)
         free(arr->entities);
+    memset(arr, 0, sizeof(entity_array));
 }
 
 struct ecs {
@@ -561,7 +579,7 @@ struct ecs {
     storage_t *components;
     storage_t *systems;
     size_t entity_count;
-    entity_array_t recyclable;
+    entity_array recyclable;
     uint32_t next_id;
 };
 
@@ -592,6 +610,7 @@ world_t* ecs_create(void) {
     world->entities = make_storage();
     world->components = make_storage();
     world->systems = make_storage();
+    entity_array_init(&world->recyclable, 0);
     return world;
 }
 
@@ -615,7 +634,8 @@ typedef struct {
 typedef struct {
     ecs_callback_t callback;
     ecs_filter_t filter;
-    entity_array_t components;
+    entity_array components;
+    bool enabled;
 } system_data;
 
 void ecs_delete(world_t *world, entity_t entity) {
@@ -681,6 +701,10 @@ entity_t ecs_component(world_t *world, size_t component_size) {
     return component;
 }
 
+entity_t ecs_tag(world_t *world) {
+    return ecs_component(world, 0);
+}
+
 entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
     entity_t system = make_entity(world, ECS_TYPE_SYSTEM);
     void *found = storage_get(world->systems, system.id);
@@ -693,7 +717,8 @@ entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter
     system_data *sd = malloc(sizeof(system_data));
     sd->callback = callback;
     sd->filter = filter;
-    memset(&sd->components, 0, sizeof(entity_array_t));
+    entity_array_init(&sd->components, 0);
+    sd->enabled = true;
     va_list args;
     va_start(args, component_count);
     for (int i = 0; i < component_count; i++) {
@@ -706,7 +731,7 @@ entity_t ecs_system(world_t *world, ecs_callback_t callback, ecs_filter_t filter
     return system;
 }
 
-void* ecs_attach(world_t *world, entity_t entity, entity_t component) {
+void* ecs_give(world_t *world, entity_t entity, entity_t component) {
     assert(ecs_isa(world, entity, ECS_TYPE_ENTITY));
     assert(ecs_isa(world, component, ECS_TYPE_COMPONENT));
     component_data *cd = storage_get(world->components, component.id);
@@ -726,7 +751,7 @@ bool ecs_has(world_t *world, entity_t entity, entity_t component) {
     return !!storage_get(cd->data, entity.id);
 }
 
-void ecs_detach(world_t *world, entity_t entity, entity_t component) {
+void ecs_remove(world_t *world, entity_t entity, entity_t component) {
     assert(ecs_isa(world, entity, ECS_TYPE_ENTITY));
     assert(ecs_isa(world, component, ECS_TYPE_COMPONENT));
     component_data *cd = storage_get(world->components, component.id);
@@ -755,7 +780,21 @@ void ecs_set(world_t *world, entity_t entity, entity_t component, void *data) {
     memcpy(dst, data, cd->data_size);
 }
 
-static void query(world_t *world, entity_array_t *components, entity_array_t *out) {
+void ecs_disable(world_t *world, entity_t entity) {
+    assert(ecs_isa(world, entity, ECS_TYPE_SYSTEM));
+    system_data *sd = storage_get(world->systems, entity.id);
+    assert(sd);
+    sd->enabled = false;
+}
+
+void ecs_enable(world_t *world, entity_t entity) {
+    assert(ecs_isa(world, entity, ECS_TYPE_SYSTEM));
+    system_data *sd = storage_get(world->systems, entity.id);
+    assert(sd);
+    sd->enabled = true;
+}
+
+static void query(world_t *world, entity_array *components, entity_array *out) {
     component_data **storages = malloc(components->entity_count * sizeof(component_data*));
     for (int i = 0; i < components->entity_count; i++) {
         assert(ecs_isa(world, components->entities[i], ECS_TYPE_COMPONENT));
@@ -792,7 +831,10 @@ void ecs_step(world_t *world) {
         if (!pair.slot)
             break;
         system_data *sd = (system_data*)imap_getval(world->systems->tree, pair.slot);
-        entity_array_t entities;
+        if (!sd->enabled)
+            continue;
+        entity_array entities;
+        entity_array_init(&entities, 0);
         query(world, &sd->components, &entities);
         for (int i = 0; i < entities.entity_count; i++) {
             if (sd->filter)
@@ -805,7 +847,7 @@ void ecs_step(world_t *world) {
     }
 }
 
-static void components_to_array(world_t *world, entity_array_t *out, int n, va_list args) {
+static void components_to_array(world_t *world, entity_array *out, int n, va_list args) {
     for (int i = 0; i < n; i++) {
         entity_t component = va_arg(args, entity_t);
         assert(ecs_isa(world, component, ECS_TYPE_COMPONENT));
@@ -815,12 +857,14 @@ static void components_to_array(world_t *world, entity_array_t *out, int n, va_l
 }
 
 entity_t* ecs_find(world_t *world, ecs_filter_t filter, int *result_count, int component_count, ...) {
-    entity_array_t components;
+    entity_array components;
+    entity_array_init(&components, 0);
     va_list args;
     va_start(args, component_count);
     components_to_array(world, &components, component_count, args);
     
-    entity_array_t tmp;
+    entity_array tmp;
+    entity_array_init(&tmp, 0);
     query(world, &components, &tmp);
     if (result_count)
         *result_count = (int)tmp.entity_count;
@@ -829,13 +873,14 @@ entity_t* ecs_find(world_t *world, ecs_filter_t filter, int *result_count, int c
 }
 
 void ecs_query(world_t *world, ecs_callback_t callback, ecs_filter_t filter, int component_count, ...) {
-    entity_array_t components;
-    memset(&components, 0, sizeof(entity_array_t));
+    entity_array components;
+    entity_array_init(&components, 0);
     va_list args;
     va_start(args, component_count);
     components_to_array(world, &components, component_count, args);
     
-    entity_array_t entities;
+    entity_array entities;
+    entity_array_init(&entities, 0);
     query(world, &components, &entities);
     for (int i = 0; i < entities.entity_count; i++)
         callback(entities.entities[i]);

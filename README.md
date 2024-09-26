@@ -47,16 +47,16 @@ int main(int argc, const char *argv[]) {
 ## TODO
 
 - [ ] Documentation + tests
+- [ ] Add Thread-saftey
 - [X] Entities+Components
 - [X] Queries
 - [X] Systems
-- [ ] Tags
+- [X] Tags
 - [ ] Prefabs
 - [ ] Relationships
 - [ ] Pipelines
 - [ ] Observers
 - [ ] Reflection
-- [ ] Rules
 
 ## Acknowledgements
 
