@@ -92,7 +92,7 @@ int main(int argc, const char *argv[]) {
     ecs_give(world, e6, t1);
     assert(ecs_has(world, e5, t1) && ecs_has(world, e6, t1));
     ecs_remove(world, e6, t1);
-    assert(ecs_has(world, e5, t1) && ecs_has(world, e6, t1));
+    assert(ecs_has(world, e5, t1) && !ecs_has(world, e6, t1));
 
     ecs_destroy(world);
     return 0;

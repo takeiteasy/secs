@@ -832,7 +832,7 @@ void ecs_step(world_t *world) {
             break;
         system_data *sd = (system_data*)imap_getval(world->systems->tree, pair.slot);
         if (!sd->enabled)
-            continue;
+            goto NEXT;
         entity_array entities;
         entity_array_init(&entities, 0);
         query(world, &sd->components, &entities);
@@ -843,6 +843,7 @@ void ecs_step(world_t *world) {
             sd->callback(entities.entities[i]);
         }
         destroy_entity_array(&entities);
+    NEXT:
         pair = imap_iterate(world->systems->tree, &iter, 0);
     }
 }
