@@ -202,20 +202,17 @@ static void* storage_emplace(storage_t *strg, entity_t e) {
     return result;
 }
 
-static void* storage_at(storage_t *strg, size_t pos) {
-    assert(pos < strg->sizeOfData);
-    return &((char*)strg->data)[pos * sizeof(char) * strg->sizeOfComponent];
-}
-
 static void storage_remove(storage_t *strg, entity_t e) {
-    memmove(storage_at(strg, sparse_remove(strg->sparse, e)),
-            storage_at(strg, --strg->sizeOfData),
+    size_t pos = sparse_remove(strg->sparse, e);
+    memmove(&((char*)strg->data)[pos * sizeof(char) * strg->sizeOfComponent],
+            &((char*)strg->data)[(strg->sizeOfData - 1) * sizeof(char) * strg->sizeOfComponent],
             strg->sizeOfComponent);
-    strg->data = realloc(strg->data, strg->sizeOfData * sizeof(char) * strg->sizeOfComponent);
+    strg->data = realloc(strg->data, --strg->sizeOfData * sizeof(char) * strg->sizeOfComponent);
 }
 
 static void* storage_get(storage_t *strg, entity_t e) {
-    return storage_at(strg, sparse_at(strg->sparse, e));
+    uint32_t pos = sparse_at(strg->sparse, e);
+    return &((char*)strg->data)[pos * sizeof(char) * strg->sizeOfComponent];
 }
 
 struct world {
@@ -469,18 +466,18 @@ void ecs_step(world_t *world) {
         if (!system_entity.alive)
             continue;
         
-        for (int j = 0; j < world->sizeOfEntities; i++) {
+        for (int j = 0; j < world->sizeOfEntities; j++) {
             int match = 1;
             for (int k = 0; k < system_data->component_count; k++) {
-                storage_t *strg = find_storage(world, system_data->components[j]);
+                storage_t *strg = find_storage(world, system_data->components[k]);
                 assert(strg);
-                if (!storage_has(strg, world->entities[i])) {
+                if (!storage_has(strg, world->entities[j])) {
                     match = 0;
                     break;
                 }
             }
             if (match)
-                system_data->callback(world->entities[i]);
+                system_data->callback(world->entities[j]);
         }
     }
 }

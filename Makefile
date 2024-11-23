@@ -37,6 +37,6 @@ clean:
 run: $(BINS)
 	sh test.sh $(OUTS)
 
-all: default run clean
+all: run clean
 
 .PHONY: default clean run all
