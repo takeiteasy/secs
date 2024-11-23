@@ -8,8 +8,7 @@
 #include "test.h"
 
 int main(int argc, const char *argv[]) {
-    World *world = EcsWorld();
-    
-    DeleteWorld(&world);
-    return EXIT_SUCCESS;
+    world_t *world = ecs_world();
+    ecs_world_destroy(&world);
+    return 0;
 }

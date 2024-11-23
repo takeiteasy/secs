@@ -5,10 +5,10 @@ PRG_SUFFIX_FLAG := 0
 endif
 
 LDFLAGS :=
-CFLAGS_INC :=
-CFLAGS := -I../src -g -Wall $(CFLAGS_INC)
+CFLAGS_INC := -I. -Itests
+CFLAGS := -g -Wall $(CFLAGS_INC)
 
-SRCS := $(wildcard *.c)
+SRCS := $(wildcard tests/*.c)
 PRGS := $(patsubst %.c,%,$(SRCS))
 PRG_SUFFIX=.exe
 BINS := $(patsubst %,%$(PRG_SUFFIX),$(PRGS))
@@ -19,7 +19,7 @@ else
 	OUTS = $(BINS)
 endif
 
-default: $(BINS)
+default: all
 
 .SECONDEXPANSION:
 OBJ = $(patsubst %$(PRG_SUFFIX),%.o,$@)
@@ -29,13 +29,13 @@ else
 	BIN = $@
 endif
 %$(PRG_SUFFIX): $(OBJS)
-	$(CC) ../src/secs.c $(OBJ) $(LDFLAGS) -o $(BIN)
+	$(CC) $(OBJ) $(LDFLAGS) -o $(BIN)
 
 clean:
 	rm $(OUTS)
 
-run:
-	sh run.sh $(OUTS)
+run: $(BINS)
+	sh test.sh $(OUTS)
 
 all: default run clean
 
