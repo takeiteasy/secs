@@ -1,6 +1,6 @@
 /*
-    zawarudo.h -- https://github.com/takeiteasy/zawarudo
-     
+    x.h -- https://github.com/takeiteasy/x
+
     Copyright (C) 2024 George Watson
 
     This program is free software: you can redistribute it and/or modify
@@ -17,25 +17,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef ZAWARUDO_HEAD
-#define ZAWARUDO_HEAD
+#ifndef __X_HEADER
+#define __X_HEADER
 #ifdef __cplusplus
 extern "C" {
 #endif
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef ZAWARUDO_ENABLE_BLOCKS
+#ifdef X_ENABLE_BLOCKS
 #ifndef BLOCKS
 #error "This platform doesn't support BLOCKS"
 #endif
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-#define ZAWARUDO_ON_WINDOWS
+#define X_ON_WINDOWS
 #endif
 
-#if defined(ZAWARUDO_ON_WINDOWS) && !defined(ZAWARUDO_NO_EXPORT)
+#if defined(X_ON_WINDOWS) && !defined(X_NO_EXPORT)
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -55,8 +55,7 @@ extern const uint64_t ecs_nil;
 extern const entity_t ecs_nil_entity;
 
 typedef struct world world_t;
-typedef world_t zawarudo_t;
-#ifdef ZAWARUDO_ENABLE_BLOCKS
+#ifdef X_ENABLE_BLOCKS
 typedef void(^system_t)(entity_t);
 typedef int(^filter_system_t)(entity_t);
 #else
@@ -95,9 +94,9 @@ EXPORT void ecs_query(world_t *world, system_t fn, filter_system_t filter, int c
 #ifdef __cplusplus
 }
 #endif
-#endif // ZAWARUDO_HEAD
+#endif // __X_HEADER
 
-#ifdef ZAWARUDO_IMPLEMENTATION
+#ifdef X_IMPLEMENTATION
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
@@ -442,7 +441,7 @@ void ecs_query(world_t *world, system_t fn, filter_system_t filter, int n, ...) 
     va_list args;
     va_start(args, n);
     entity_t *components = vargs_components(world, n, args);
-    
+
     for (int i = 0; i < world->sizeOfEntities; i++) {
         int match = 1;
         for (int j = 0; j < n; j++) {
@@ -465,7 +464,7 @@ void ecs_step(world_t *world) {
         assert(entity_isa(world, system_entity, ECS_SYSTEM));
         if (!system_entity.alive)
             continue;
-        
+
         for (int j = 0; j < world->sizeOfEntities; j++) {
             int match = 1;
             for (int k = 0; k < system_data->component_count; k++) {

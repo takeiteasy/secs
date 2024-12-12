@@ -1,6 +1,6 @@
 //
 //  test.h
-//  secs
+//  x
 //
 //  Created by George Watson on 19/11/2022.
 //
@@ -8,8 +8,8 @@
 #ifndef test_h
 #define test_h
 #include <stdio.h>
-#define ZAWARUDO_IMPLEMENTATION
-#include "zawarudo.h"
+#define X_IMPLEMENTATION
+#include "x.h"
 #if defined(_MSC_VER) || (defined(__STDC__) && __STDC_VERSION__ < 199901L)
 typedef enum bool { false = 0, true = !false } bool;
 #else

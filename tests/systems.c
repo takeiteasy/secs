@@ -1,6 +1,6 @@
 //
 //  systems.c
-//  zawarudo
+//  x
 //
 //  Created by George Watson on 19/11/2022.
 //
@@ -37,4 +37,3 @@ int main(int argc, const char *argv[]) {
     ecs_world_destroy(&world);
     return 0;
 }
-

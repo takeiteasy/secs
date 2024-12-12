@@ -1,6 +1,6 @@
 //
 //  main.c
-//  zawarudo
+//  x
 //
 //  Created by George Watson on 19/11/2022.
 //
